@@ -1,0 +1,82 @@
+use std::str::FromStr;
+use crate::ast;
+
+grammar;
+
+pub Program: ast::Program = {
+  <declarations: Declaration*> => ast::Program { <> }
+};
+
+Declaration: ast::Declaration = {
+    <decl: EndpointDeclaration> => ast::Declaration::Endpoint(decl),
+};
+
+EndpointDeclaration: ast::EndpointDeclaration = {
+  <verb: HttpVerb> <path: HttpPath> <block: Block> => ast::EndpointDeclaration { <> }
+};
+
+HttpVerb: ast::HttpVerb = {
+  "GET" => ast::HttpVerb::Get
+}
+
+HttpPath: ast::HttpPath = {
+  <parts: HttpPathPart*> => ast::HttpPath { <> }
+}
+
+HttpPathPart: ast::HttpPathPart = {
+  "/" "{" <ident: Identifier> "}" => ast::HttpPathPart::Variable(ident),
+  "/" <lit: r"[a-z]+"> => ast::HttpPathPart::Literal(lit.to_string())
+}
+
+Block: ast::Block = {
+  "{" <statements: BlockStatement*> "}" => ast::Block { <> }
+}
+
+BlockStatement: ast::BlockStatement = {
+  "let" <lhs: Identifier> "=" <rhs: Expression> => ast::BlockStatement::Binding { <> },
+  FunctionCall => ast::BlockStatement::FunctionCall(<>)
+}
+
+Identifier: ast::Identifier = {
+  r"[a-z]+" => ast::Identifier(<>.to_string())
+}
+
+Expression: ast::Expression = {
+  <term: ExpressionTerm> => ast::Expression::Term(term),
+  <lhs: Expression> <operator: Operator> <rhs: ExpressionTerm> => ast::Expression::Operator { 
+    lhs: ast::ExpressionTerm::Expression(Box::new(lhs)), 
+    operator, 
+    rhs
+  }
+}
+
+ExpressionTerm: ast::ExpressionTerm = {
+  Literal => ast::ExpressionTerm::Literal(<>),
+  Identifier => ast::ExpressionTerm::Identifier(<>),
+  "(" <expr: Expression> ")" => ast::ExpressionTerm::Expression(Box::new(expr))
+}
+
+Literal: ast::Literal = {
+  r"[0-9]+" => ast::Literal::Number(i64::from_str(<>).expect("parse error"))
+}
+
+Operator: ast::Operator = {
+  "+" => ast::Operator::Add
+}
+
+FunctionCall: ast::FunctionCall = {
+  <ident: Identifier> "(" <arguments: ArgumentList> ")" => ast::FunctionCall { <> }
+}
+
+ArgumentList: Vec<ast::Argument> = {
+  Argument => vec![<>],
+  <first:Argument> "," <rest:ArgumentList> => { 
+    let mut list = vec![first];
+    list.extend_from_slice(&rest);
+    list
+  }
+}
+
+Argument: ast::Argument = {
+  <ident: Identifier> ":" <value: Expression> => ast::Argument { <> }
+}
