@@ -1,17 +1,21 @@
-use std::{collections::HashMap, convert::Infallible, io::Read, path};
+use std::{collections::HashMap, convert::Infallible};
 
-use ast::{HttpPathPart, Identifier, Literal};
+use assets_manager::AssetCache;
+use ast::Identifier;
 use hyper::{
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
+use template::Template;
 
 #[macro_use]
 extern crate lalrpop_util;
 lalrpop_mod!(pub program);
 
 mod ast;
+mod loader;
+mod template;
 
 #[tokio::main]
 async fn main() {
@@ -30,9 +34,9 @@ async fn main() {
                         .takes_value(true),
                 )
                 .arg(
-                    clap::Arg::with_name("PROGRAM")
-                        .help("path to the program to run")
-                        .required(true)
+                    clap::Arg::with_name("DIRECTORY")
+                        .help("base path for the application")
+                        .default_value(".")
                         .index(1),
                 ),
         )
@@ -46,15 +50,9 @@ async fn main() {
 }
 
 async fn subcommand_run<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<(), anyhow::Error> {
-    let path = matches.value_of("PROGRAM").unwrap();
-
-    let mut file = std::fs::File::open(path)?;
-    let mut code = String::new();
-    file.read_to_string(&mut code)?;
-
-    let program = program::ProgramParser::new()
-        .parse(&code)
-        .expect("parse error");
+    let path = matches.value_of("DIRECTORY").unwrap();
+    let cache = AssetCache::new(path)?;
+    let cache = std::sync::Arc::new(std::sync::Mutex::new(cache));
 
     let port = matches
         .value_of("PORT")
@@ -63,12 +61,12 @@ async fn subcommand_run<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<(), any
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
 
-    let make_svc = make_service_fn(|socket: &AddrStream| {
-        let program = program.clone();
+    let make_svc = make_service_fn(|_socket: &AddrStream| {
+        let cache = cache.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req: Request<Body>| {
-                let program = program.clone();
-                async move { handle_request(req, &program).await }
+                let cache = cache.clone();
+                async move { handle_request(req, cache).await }
             }))
         }
     });
@@ -81,146 +79,139 @@ async fn subcommand_run<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<(), any
     Ok(())
 }
 
-pub async fn handle_request(request: Request<Body>, program: &ast::Program) -> Result<Response<Body>, Infallible> {
-    
-    for decl in &program.declarations {
-        match decl {
-            ast::Declaration::Endpoint(endpoint) => {
-                if let Some(matches) = match_request(&endpoint, &request) {
-                    return execute_endpoint(&endpoint, &request, &matches);
-                }
-            }
-        }
-    }
+pub async fn handle_request(
+    request: Request<Body>,
+    cache: std::sync::Arc<std::sync::Mutex<assets_manager::AssetCache>>,
+) -> Result<Response<Body>, Infallible> {
+    println!("Request: {:?}", request);
 
-    Ok::<_, Infallible>(Response::new(Body::from("Not found")))
-}
-
-fn match_request(endpoint: &ast::EndpointDeclaration, request: &Request<Body>) -> Option<HashMap<ast::Identifier, Value>> {
-    let verbs_match = match (request.method(), &endpoint.verb) {
-        (&hyper::Method::GET, &ast::HttpVerb::Get) => true,
-        (&hyper::Method::POST, &ast::HttpVerb::Post) => true,
-        (&hyper::Method::PUT, &ast::HttpVerb::Put) => true,
-        (&hyper::Method::PATCH, &ast::HttpVerb::Patch) => true,
-        (&hyper::Method::DELETE, &ast::HttpVerb::Delete) => true,
-        _ => false
+    let path = match request.method() {
+        &hyper::Method::GET => format!(
+            "routes/{}/index",
+            request.uri().path().trim_matches('/')
+        ),
+        _ => unimplemented!(),
     };
 
-    if !verbs_match {
-        return None
-    }
+    println!("Loading route from {}", path);
 
-    let path_parts = request.uri().path().strip_prefix("/").unwrap().split("/").collect::<Vec<_>>();
-    let endpoint_parts = &endpoint.path.parts;
+    let program = {
+        let cache = cache.lock().expect("failed to lock cache");
+        let handle = cache.load::<ast::Program>(&path);
+        handle.map(|file| file.read().clone())
+    };
 
-    if path_parts.len() != endpoint_parts.len() {
-        return None
-    }
+    match program {
+        Ok(program) => {
+            let mut scope = Scope::default();
+            execute_program(&program, &mut scope)?;
 
-    let mut matches = HashMap::new();
 
-    for (path_part, endpoint_part) in path_parts.iter().zip(endpoint_parts) {
-        match endpoint_part {
-            HttpPathPart::Literal(literal) => {
-                if literal != *path_part {
-                    return None;
+            let template = {
+                let cache = cache.lock().expect("failed to lock cache");
+                let handle = cache.load::<Template>(&path);
+                handle.map(|file| file.read().clone())
+            };
+
+            match template {
+                Ok(template) => match template.render(&scope) {
+                    Ok(body) => Ok::<_, Infallible>(Response::new(Body::from(body))),
+                    Err(error) => {
+                        eprintln!("{}", error);
+                        Ok::<_, Infallible>(Response::new(Body::from(error.to_string())))
+                    }
+                },
+
+                Err(error) => {
+                    eprintln!("{}", error);
+                    Ok::<_, Infallible>(Response::new(Body::from(error.to_string())))
                 }
-            },
-
-            HttpPathPart::Variable(identifier) => {
-                matches.insert(identifier.clone(), Value::String(path_part.to_string()));
             }
         }
-    }
 
-    Some(matches)
+        Err(error) => {
+            eprintln!("{}", error);
+            Ok::<_, Infallible>(Response::new(Body::from(error.to_string())))
+        }
+    }
 }
 
-fn execute_endpoint(endpoint: &ast::EndpointDeclaration, request: &Request<Body>, matches: &HashMap<ast::Identifier, Value>) -> Result<Response<Body>, Infallible> {
-    let mut bindings = matches.clone();
+#[derive(Default, Debug)]
+pub struct Scope {
+    bindings: HashMap<Identifier, Value>,
+}
 
-    let mut response = Response::new(Body::empty());
-    
-    for statement in &endpoint.block.statements {
+impl Scope {
+    pub fn child(&self) -> Self {
+        Scope {
+            bindings: self.bindings.clone(),
+        }
+    }
+}
+
+fn execute_program(program: &ast::Program, scope: &mut Scope) -> Result<(), Infallible> {
+    for statement in &program.block.statements {
         match statement {
-            ast::BlockStatement::Binding { lhs, rhs } => {
-                if let Some(value) = evaluate_expression(rhs, &bindings) {
-                    bindings.insert(lhs.clone(), value);
+            ast::Statement::Binding { lhs, rhs } => {
+                if let Some(value) = evaluate_expression(rhs, &scope) {
+                    scope.bindings.insert(lhs.clone(), value);
                 } else {
                     unimplemented!();
                 }
-            },
+            }
 
-            ast::BlockStatement::FunctionCall(call) => {
-                match &call.ident.0 {
-                    x if x == "render" => {
-                        let mut mime_type = None;
-                        let mut body_text = None;
-                        let mut status = 200;
-
-                        for argument in &call.arguments {
-                            if argument.ident.0 == "text" {
-                                match evaluate_expression(&argument.value, &bindings) {
-                                    Some(Value::String(string)) => { 
-                                        mime_type = Some("text/plain".to_string());
-                                        body_text = Some(string)
-                                    },
-                                    Some(Value::Number(number)) => {
-                                        mime_type = Some("text/plain".to_string());
-                                        body_text = Some(number.to_string())
-                                    },
-                                    None => unimplemented!()
-                                }
-                            } else if argument.ident.0 == "status" {
-                                match evaluate_expression(&argument.value, &bindings) {
-                                    Some(Value::String(string)) => unimplemented!(),
-                                    Some(Value::Number(number)) => {
-                                        status = number;
-                                    },
-                                    None => unimplemented!()
-                                }
-                            }
-                        }
-
-                        response = Response::new(Body::from(body_text.unwrap()));
-                    },
-                    other => unimplemented!("function {}", other)
-                }
+            ast::Statement::FunctionCall(_call) => {
+                unimplemented!()
             }
         }
     }
 
-    Ok::<_, Infallible>(response)
+    Ok::<_, Infallible>(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Number(i64),
-    String(String)
+    String(String),
 }
 
-fn evaluate_expression(expression: &ast::Expression, bindings: &HashMap<Identifier, Value>) -> Option<Value> {
+impl ToString for Value {
+    fn to_string(&self) -> String {
+        match self {
+            Value::Number(number) => number.to_string(),
+            Value::String(string) => string.clone(),
+        }
+    }
+}
+
+fn evaluate_expression(expression: &ast::Expression, scope: &Scope) -> Option<Value> {
     match expression {
-        ast::Expression::Term(term) => evaluate_expression_term(term, bindings),
+        ast::Expression::Term(term) => evaluate_expression_term(term, scope),
         ast::Expression::Operator { lhs, operator, rhs } => {
-            let lhs_value = evaluate_expression_term(lhs, bindings);
-            let rhs_value = evaluate_expression_term(rhs, bindings);
+            let lhs_value = evaluate_expression_term(lhs, scope);
+            let rhs_value = evaluate_expression_term(rhs, scope);
 
             match operator {
                 ast::Operator::Add => match (lhs_value, rhs_value) {
-                    (Some(Value::String(lhs)), Some(Value::String(rhs))) => Some(Value::String(lhs + &rhs)),
-                    _ => None
-                }
+                    (Some(Value::String(lhs)), Some(Value::String(rhs))) => {
+                        Some(Value::String(lhs + &rhs))
+                    }
+                    _ => None,
+                },
             }
         }
     }
 }
 
-fn evaluate_expression_term(term: &ast::ExpressionTerm, bindings: &HashMap<Identifier, Value>) -> Option<Value> {
+fn evaluate_expression_term(term: &ast::ExpressionTerm, scope: &Scope) -> Option<Value> {
     match term {
-        ast::ExpressionTerm::Identifier(identifier) => bindings.get(identifier).clone().map(|x| x.clone()),
+        ast::ExpressionTerm::Identifier(identifier) => {
+            scope.bindings.get(identifier).clone().map(|x| x.clone())
+        }
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Some(Value::Number(*number)),
-        ast::ExpressionTerm::Literal(ast::Literal::String(string)) => Some(Value::String(string.clone())),
-        ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, bindings)
+        ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
+            Some(Value::String(string.clone()))
+        }
+        ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, scope),
     }
 }
