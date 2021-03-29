@@ -1,5 +1,0 @@
-
-GET /add/{lhs}/{rhs} {
-  let result = lhs + rhs
-  render(text: result, status: 200)
-}
