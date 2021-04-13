@@ -29,29 +29,24 @@ impl Template {
     }
 }
 
-impl assets_manager::Asset for Template {
-    const EXTENSIONS: &'static [&'static str] = &["html.hbs"];
+impl blox_assets::Asset for Template {
+    const EXTENSIONS: &'static [&'static str] = &[".html.hbs"];
     type Loader = TemplateLoader;
 }
 
 pub struct TemplateLoader;
 
-impl assets_manager::loader::Loader<Template> for TemplateLoader {
-    fn load(
-        content: std::borrow::Cow<[u8]>,
-        ext: &str,
-    ) -> Result<Template, assets_manager::BoxedError> {
+impl blox_assets::Loader<Template> for TemplateLoader {
+    fn load(content: &[u8], filename: &str) -> Result<Template, anyhow::Error> {
         let input = String::from_utf8(content.to_vec())?;
 
-        match ext {
-            "html.hbs" => {
-                let template = handlebars::Template::compile(input)
-                    .map_err(|err| TemplateRenderError(format!("{}", err)))?;
+        if filename.ends_with(".html.hbs") {
+            let template = handlebars::Template::compile(input)
+                .map_err(|err| TemplateRenderError(format!("{}", err)))?;
 
-                Ok(Template::Handlebars(template))
-            }
-
-            _ => unimplemented!(),
+            Ok(Template::Handlebars(template))
+        } else {
+            unimplemented!()
         }
     }
 }

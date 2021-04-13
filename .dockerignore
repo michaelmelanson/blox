@@ -1,0 +1,5 @@
+.dockerignore
+examples/
+target/
+Dockerfile*
+docker-compose.yml
