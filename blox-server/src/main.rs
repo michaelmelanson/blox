@@ -15,8 +15,7 @@ mod assets;
 
 use assets::{program::BloxProgram, template::Template};
 use blox_assets::types::AssetPath;
-use blox_interpreter::{Scope, execute_program};
-
+use blox_interpreter::{execute_program, Scope};
 
 #[tokio::main]
 async fn main() {
@@ -100,8 +99,7 @@ pub async fn handle_request(
     );
 
     let path = AssetPath::new(match method {
-        &hyper::Method::GET => 
-            std::path::Path::new("routes")
+        &hyper::Method::GET => std::path::Path::new("routes")
             .join(uri.path().trim_matches('/'))
             .join("index")
             .to_string_lossy()
