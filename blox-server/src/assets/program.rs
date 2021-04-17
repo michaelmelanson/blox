@@ -1,11 +1,20 @@
 use std::fmt::Display;
 
-use crate::ast;
+use blox_language::{ast, program};
+use program::ProgramParser;
 
-impl blox_assets::Asset for ast::Program {
+pub struct BloxProgram(ast::Program);
+
+impl blox_assets::Asset for BloxProgram {
     const EXTENSIONS: &'static [&'static str] = &[".blox"];
 
     type Loader = BloxLoader;
+}
+
+impl Into<ast::Program> for BloxProgram {
+    fn into(self) -> ast::Program {
+        self.0
+    }
 }
 
 pub struct BloxLoader;
@@ -21,12 +30,13 @@ impl Display for BloxLoaderError {
 
 impl std::error::Error for BloxLoaderError {}
 
-impl blox_assets::Loader<ast::Program> for BloxLoader {
-    fn load(content: &[u8], _extension: &str) -> anyhow::Result<ast::Program> {
+impl blox_assets::Loader<BloxProgram> for BloxLoader {
+    fn load(content: &[u8], _extension: &str) -> anyhow::Result<BloxProgram> {
         let input = String::from_utf8(content.to_vec())?;
 
-        crate::program::ProgramParser::new()
+        ProgramParser::new()
             .parse(&input)
             .map_err(|err| Box::new(BloxLoaderError(format!("{:?}", err))).into())
+            .map(|program| BloxProgram(program))
     }
 }

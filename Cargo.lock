@@ -136,11 +136,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "blox-assets",
+ "blox-interpreter",
+ "blox-language",
  "clap",
  "handlebars",
  "hyper",
- "lalrpop",
- "lalrpop-util",
  "regex",
  "tokio",
  "tracing",
@@ -153,6 +153,24 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "tracing",
+]
+
+[[package]]
+name = "blox-interpreter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blox-language",
+ "tracing",
+]
+
+[[package]]
+name = "blox-language"
+version = "0.1.0"
+dependencies = [
+ "blox-assets",
+ "lalrpop",
+ "lalrpop-util",
 ]
 
 [[package]]

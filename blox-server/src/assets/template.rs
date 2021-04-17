@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use handlebars::Handlebars;
 
-use crate::Scope;
+use blox_interpreter::Scope;
 
 #[derive(Clone)]
 pub enum Template {
