@@ -12,7 +12,7 @@ pub struct AssetManager {
 impl AssetManager {
     pub fn new(base_dir: &str) -> anyhow::Result<Self> {
         let base_dir = std::fs::canonicalize(base_dir)?;
-        Ok(AssetManager { base_dir: base_dir })
+        Ok(AssetManager { base_dir })
     }
 
     pub fn load<T: Asset>(&mut self, asset_path: &AssetPath) -> anyhow::Result<T> {

@@ -59,7 +59,7 @@ pub fn evaluate_expression(expression: &ast::Expression, scope: &Scope) -> Optio
 pub fn evaluate_expression_term(term: &ast::ExpressionTerm, scope: &Scope) -> Option<Value> {
     match term {
         ast::ExpressionTerm::Identifier(identifier) => {
-            scope.bindings.get(identifier).clone().map(|x| x.clone())
+            scope.bindings.get(identifier).cloned()
         }
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Some(Value::Number(*number)),
         ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {

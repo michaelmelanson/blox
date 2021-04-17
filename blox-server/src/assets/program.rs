@@ -11,9 +11,9 @@ impl blox_assets::Asset for BloxProgram {
     type Loader = BloxLoader;
 }
 
-impl Into<ast::Program> for BloxProgram {
-    fn into(self) -> ast::Program {
-        self.0
+impl From<BloxProgram> for ast::Program {
+    fn from(program: BloxProgram) -> Self {
+        program.0
     }
 }
 
@@ -37,6 +37,6 @@ impl blox_assets::Loader<BloxProgram> for BloxLoader {
         ProgramParser::new()
             .parse(&input)
             .map_err(|err| Box::new(BloxLoaderError(format!("{:?}", err))).into())
-            .map(|program| BloxProgram(program))
+            .map(BloxProgram)
     }
 }

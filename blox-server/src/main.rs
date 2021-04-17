@@ -98,8 +98,8 @@ pub async fn handle_request(
         "Request info:"
     );
 
-    let path = AssetPath::new(match method {
-        &hyper::Method::GET => std::path::Path::new("routes")
+    let path = AssetPath::new(match *method {
+        hyper::Method::GET => std::path::Path::new("routes")
             .join(uri.path().trim_matches('/'))
             .join("index")
             .to_string_lossy()
