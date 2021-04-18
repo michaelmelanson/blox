@@ -31,4 +31,47 @@ mod tests {
             }
         }, actual);
     }
+
+    #[test]
+    fn parse_expressions() {
+        let actual = parse("let test = 55 + 42").expect("parse error");
+        assert_eq!(ast::Program {
+            block: ast::Block {
+                statements: vec![
+                    ast::Statement::Binding {
+                        lhs: ast::Identifier("test".to_string()),
+                        rhs: ast::Expression::Operator {
+                            lhs: ast::ExpressionTerm::Literal(ast::Literal::Number(55)),
+                            operator: ast::Operator::Add,
+                            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(42))
+                        }
+                    }
+                ]
+            }
+        }, actual);
+    }
+
+    #[test]
+    fn test_nested_expressions() {
+        let actual = parse("let test = (1 * 2) + 3").expect("parse error");
+        assert_eq!(ast::Program {
+            block: ast::Block {
+                statements: vec![
+                    ast::Statement::Binding {
+                        lhs: ast::Identifier("test".to_string()),
+                        rhs: ast::Expression::Operator {
+                            lhs: ast::ExpressionTerm::Expression(Box::new(ast::Expression::Operator {
+                                lhs: ast::ExpressionTerm::Literal(ast::Literal::Number(1)),
+                                operator: ast::Operator::Multiply,
+                                rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(2))
+                            })),
+                            operator: ast::Operator::Add,
+                            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(3))
+                        }
+                    }
+                ]
+            }
+        }, actual);
+    }
+
 }

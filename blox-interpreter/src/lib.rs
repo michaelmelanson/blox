@@ -46,8 +46,14 @@ pub fn evaluate_expression(expression: &ast::Expression, scope: &Scope) -> Optio
 
             match operator {
                 ast::Operator::Add => match (lhs_value, rhs_value) {
-                    (Some(Value::String(lhs)), Some(Value::String(rhs))) => {
-                        Some(Value::String(lhs + &rhs))
+                    (Some(Value::Number(lhs)), Some(Value::Number(rhs))) => {
+                        Some(Value::Number(lhs + &rhs))
+                    }
+                    _ => None,
+                },
+                ast::Operator::Multiply => match (lhs_value, rhs_value) {
+                    (Some(Value::Number(lhs)), Some(Value::Number(rhs))) => {
+                        Some(Value::Number(lhs * &rhs))
                     }
                     _ => None,
                 },

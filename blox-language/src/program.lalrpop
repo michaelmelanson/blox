@@ -22,8 +22,8 @@ Identifier: ast::Identifier = {
 
 Expression: ast::Expression = {
   <term: ExpressionTerm> => ast::Expression::Term(term),
-  <lhs: Expression> <operator: Operator> <rhs: ExpressionTerm> => ast::Expression::Operator { 
-    lhs: ast::ExpressionTerm::Expression(Box::new(lhs)), 
+  <lhs: ExpressionTerm> <operator: Operator> <rhs: ExpressionTerm> => ast::Expression::Operator { 
+    lhs,
     operator, 
     rhs
   }
@@ -41,7 +41,8 @@ Literal: ast::Literal = {
 }
 
 Operator: ast::Operator = {
-  "+" => ast::Operator::Add
+  "+" => ast::Operator::Add,
+  "*" => ast::Operator::Multiply
 }
 
 FunctionCall: ast::FunctionCall = {
