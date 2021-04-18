@@ -48,12 +48,12 @@ pub enum Operator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
-    pub ident: Identifier,
+    pub identifier: Identifier,
     pub value: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
-    pub ident: Identifier,
+    pub identifier: Identifier,
     pub arguments: Vec<Argument>,
 }
