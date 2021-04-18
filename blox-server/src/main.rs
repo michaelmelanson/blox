@@ -9,12 +9,13 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
+use router::request_asset_path;
 use tracing::{error, info, info_span, metadata::LevelFilter};
 
 mod assets;
+mod router;
 
 use assets::{program::BloxProgram, template::Template};
-use blox_assets::types::AssetPath;
 use blox_interpreter::{execute_program, Scope};
 
 #[tokio::main]
@@ -98,14 +99,8 @@ pub async fn handle_request(
         "Request info:"
     );
 
-    let path = AssetPath::new(match *method {
-        hyper::Method::GET => std::path::Path::new("routes")
-            .join(uri.path().trim_matches('/'))
-            .join("index")
-            .to_string_lossy()
-            .to_string(),
-        _ => unimplemented!(),
-    });
+    
+    let path = request_asset_path(&request)?;
 
     let mut assets = assets.lock().unwrap();
 
