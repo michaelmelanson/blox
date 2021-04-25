@@ -4,6 +4,7 @@ use crate::types::AssetPath;
 pub enum AssetError {
     BaseDirNotFound(String),
     AssetNotFound(AssetPath),
+    NoMatchingExtension(AssetPath, &'static [&'static str])
 }
 
 impl std::fmt::Display for AssetError {
@@ -14,6 +15,9 @@ impl std::fmt::Display for AssetError {
             }
             AssetError::AssetNotFound(path) => {
                 write!(f, "Could not find file {}", path)
+            }
+            AssetError::NoMatchingExtension(path, extensions) => {
+                write!(f, "No assets for {} match extensions {:?}", path, extensions)
             }
         }
     }

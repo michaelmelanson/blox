@@ -43,7 +43,7 @@ pub enum Literal {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     Add,
-    Multiply
+    Multiply,
 }
 
 #[derive(Debug, Clone, PartialEq)]
