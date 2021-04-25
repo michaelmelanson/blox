@@ -66,9 +66,7 @@ pub fn evaluate_expression_term(term: &ast::ExpressionTerm, scope: &Scope) -> Op
     match term {
         ast::ExpressionTerm::Identifier(identifier) => scope.bindings.get(identifier).cloned(),
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Some(Value::Number(*number)),
-        ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
-            Some(Value::String(string.clone()))
-        }
+        ast::ExpressionTerm::Literal(ast::Literal::String(string)) => Some(Value::String(string.clone())),
         ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, scope),
     }
 }

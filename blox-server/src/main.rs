@@ -90,10 +90,11 @@ pub async fn handle_request(
     assets: Arc<Mutex<AssetManager>>,
 ) -> anyhow::Result<Response<Body>> {
     let method = request.method();
-    tracing::Span::current().record("method", &method.as_str());
-
     let uri = request.uri();
-    tracing::Span::current().record("uri", &uri.path_and_query().unwrap().to_string().as_str());
+    
+    tracing::Span::current()
+        .record("method", &method.as_str())
+        .record("uri", &uri.path_and_query().unwrap().to_string().as_str());
 
     let (path, bindings) = request_asset_path(request.method(), request.uri())?;
 
@@ -111,7 +112,7 @@ pub async fn handle_request(
 
         Err(error) => {
             match error.downcast_ref::<AssetError>() {
-                
+
                 // ignore this, just means there's no Blox code
                 Some(AssetError::NoMatchingExtension(_, _)) => {},
 
