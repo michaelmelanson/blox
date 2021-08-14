@@ -50,18 +50,33 @@ mod tests {
     use super::evaluate_expression;
 
     #[test]
-    fn test_evaluate_addition() {
+    fn test_evaluate_addition_identifier_literal() {
         let expression = ast::Expression::Operator {
             lhs: ast::ExpressionTerm::Identifier(ast::Identifier("x".to_string())),
             operator: ast::Operator::Add,
-            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(1))
+            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(1)),
         };
 
         let mut scope = Scope::default();
         scope.insert_binding("x".to_string(), Value::Number(55));
 
         let result = evaluate_expression(&expression, &scope);
-
         assert_eq!(result, Some(Value::Number(56)));
+    }
+
+    #[test]
+    fn test_evaluate_addition_identifier_identifier() {
+        let expression = ast::Expression::Operator {
+            lhs: ast::ExpressionTerm::Identifier(ast::Identifier("x".to_string())),
+            operator: ast::Operator::Add,
+            rhs: ast::ExpressionTerm::Identifier(ast::Identifier("y".to_string())),
+        };
+
+        let mut scope = Scope::default();
+        scope.insert_binding("x".to_string(), Value::Number(55));
+        scope.insert_binding("y".to_string(), Value::Number(42));
+
+        let result = evaluate_expression(&expression, &scope);
+        assert_eq!(result, Some(Value::Number(97)));
     }
 }
