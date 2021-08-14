@@ -26,7 +26,7 @@ impl From<Component<'_>> for Action {
             "create" => Action::Create,
             "update" => Action::Update,
             "delete" => Action::Delete,
-            other => Action::Custom(other.to_string())
+            other => Action::Custom(other.to_string()),
         }
     }
 }

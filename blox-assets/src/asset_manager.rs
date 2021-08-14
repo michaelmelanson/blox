@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::DirEntry,
-    path::{PathBuf, Component},
+    path::{Component, PathBuf},
 };
 
 use tracing::{debug, error, info, info_span, instrument, warn};
@@ -82,16 +82,17 @@ impl AssetManager {
     fn reindex(&mut self) -> anyhow::Result<()> {
         self.asset_index.clear();
 
-        let files = walkdir::WalkDir::new(&self.base_dir).into_iter()
+        let files = walkdir::WalkDir::new(&self.base_dir)
+            .into_iter()
             .filter_map(|e| e.ok())
             .filter_map(|e| e.path().canonicalize().ok());
 
         for path in files {
-            if !path.is_file() { continue; }
+            if !path.is_file() {
+                continue;
+            }
 
             if let Ok(relative_path) = path.strip_prefix(&self.base_dir) {
-                println!("path: {:?}", relative_path);
-
                 let mut components = relative_path.components();
 
                 match components.next() {
@@ -102,7 +103,9 @@ impl AssetManager {
                             let action = RoutePathPart::Action(Action::from(action_component));
 
                             for component in components {
-                                let part = RoutePathPart::Collection(component.as_os_str().to_str().unwrap().to_string());
+                                let part = RoutePathPart::Collection(
+                                    component.as_os_str().to_str().unwrap().to_string(),
+                                );
                                 route_path_parts.push(part);
                             }
 
@@ -112,10 +115,8 @@ impl AssetManager {
                         }
 
                         let asset_path = AssetPath::Route(route_path_parts);
-                        self.asset_index.entry(asset_path)
-                            .or_default()
-                            .insert(path);
-                    },
+                        self.asset_index.entry(asset_path).or_default().insert(path);
+                    }
 
                     Some(_) => info!("Unrecognized path: {:?}", relative_path),
 
