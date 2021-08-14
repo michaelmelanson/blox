@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::DirEntry,
-    path::PathBuf,
+    path::{PathBuf, Component},
 };
 
 use tracing::{debug, error, info, info_span, instrument, warn};
@@ -10,7 +10,7 @@ use crate::{
     asset::Asset,
     error::AssetError,
     loader::Loader,
-    types::{AssetPath, Action, RoutePathPart},
+    types::{Action, AssetPath, RoutePathPart},
 };
 
 #[derive(Clone)]
@@ -52,7 +52,11 @@ impl AssetManager {
             let mut matching_path = None;
 
             for extension in T::EXTENSIONS {
-                if let Some(path) = file_paths.iter().find(|path| path.file_name().map(|f| f.to_string_lossy().ends_with(extension)) == Some(true)) {
+                if let Some(path) = file_paths.iter().find(|path| {
+                    path.file_name()
+                        .map(|f| f.to_string_lossy().ends_with(extension))
+                        == Some(true)
+                }) {
                     matching_path = Some((path, extension));
                     break;
                 }
@@ -68,7 +72,7 @@ impl AssetManager {
             } else {
                 Err(anyhow::Error::new(AssetError::NoMatchingExtension(
                     asset_path.clone(),
-                    T::EXTENSIONS
+                    T::EXTENSIONS,
                 )))
             }
         })
@@ -78,15 +82,44 @@ impl AssetManager {
     fn reindex(&mut self) -> anyhow::Result<()> {
         self.asset_index.clear();
 
-        for entry in std::fs::read_dir(&self.base_dir)? {
-            match entry {
-                Ok(entry) => self.add_root_entry(&entry)?,
+        let files = walkdir::WalkDir::new(&self.base_dir).into_iter()
+            .filter_map(|e| e.ok())
+            .filter_map(|e| e.path().canonicalize().ok());
 
-                Err(error) => {
-                    error!(
-                        error = error.to_string().as_str(),
-                        "error reading directory entry"
-                    );
+        for path in files {
+            if !path.is_file() { continue; }
+
+            if let Ok(relative_path) = path.strip_prefix(&self.base_dir) {
+                println!("path: {:?}", relative_path);
+
+                let mut components = relative_path.components();
+
+                match components.next() {
+                    Some(Component::Normal(c)) if c.to_str() == Some("routes") => {
+                        let mut route_path_parts = Vec::new();
+
+                        if let Some(action_component) = components.next_back() {
+                            let action = RoutePathPart::Action(Action::from(action_component));
+
+                            for component in components {
+                                let part = RoutePathPart::Collection(component.as_os_str().to_str().unwrap().to_string());
+                                route_path_parts.push(part);
+                            }
+
+                            route_path_parts.push(action);
+                        } else {
+                            unimplemented!();
+                        }
+
+                        let asset_path = AssetPath::Route(route_path_parts);
+                        self.asset_index.entry(asset_path)
+                            .or_default()
+                            .insert(path);
+                    },
+
+                    Some(_) => info!("Unrecognized path: {:?}", relative_path),
+
+                    None => {}
                 }
             }
         }
@@ -94,11 +127,8 @@ impl AssetManager {
         Ok(())
     }
 
-    #[instrument(skip(self, entry), fields(name))]
     pub fn add_root_entry(&mut self, entry: &DirEntry) -> anyhow::Result<()> {
         let filename = entry.file_name().to_string_lossy().to_string();
-        tracing::Span::current().record("name", &filename.as_str());
-
         match filename.as_str() {
             "routes" => {
                 self.add_route_directory(&entry, vec![])?;
@@ -111,7 +141,6 @@ impl AssetManager {
         Ok(())
     }
 
-    #[instrument(skip(self, entry), fields(name))]
     pub fn add_route_directory(
         &mut self,
         entry: &DirEntry,
@@ -134,9 +163,7 @@ impl AssetManager {
                             let part = match base_name {
                                 "index" => RoutePathPart::Action(Action::Index),
                                 "show" => RoutePathPart::Action(Action::Show),
-                                other => {
-                                    RoutePathPart::Action(Action::Custom(other.to_string()))
-                                }
+                                other => RoutePathPart::Action(Action::Custom(other.to_string())),
                             };
 
                             let mut file_asset_path = path.clone();

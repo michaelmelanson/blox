@@ -38,6 +38,7 @@ pub enum ExpressionTerm {
 pub enum Literal {
     Number(i64),
     String(String),
+    Symbol(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

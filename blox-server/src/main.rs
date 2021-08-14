@@ -16,7 +16,7 @@ mod assets;
 mod router;
 
 use assets::{program::BloxProgram, template::Template};
-use blox_interpreter::{Scope, Value, execute_program};
+use blox_interpreter::{execute_program, Scope, Value};
 
 #[tokio::main]
 async fn main() {
@@ -91,7 +91,7 @@ pub async fn handle_request(
 ) -> anyhow::Result<Response<Body>> {
     let method = request.method();
     let uri = request.uri();
-    
+
     tracing::Span::current()
         .record("method", &method.as_str())
         .record("uri", &uri.path_and_query().unwrap().to_string().as_str());
@@ -106,19 +106,18 @@ pub async fn handle_request(
     }
 
     match assets.load::<BloxProgram>(&path) {
-        Ok(program) => {           
+        Ok(program) => {
             execute_program(&program.into(), &mut scope)?;
-        },
+        }
 
         Err(error) => {
             match error.downcast_ref::<AssetError>() {
-
                 // ignore this, just means there's no Blox code
-                Some(AssetError::NoMatchingExtension(_, _)) => {},
+                Some(AssetError::NoMatchingExtension(_, _)) => {}
 
                 _ => {
                     error!(error = error.to_string().as_str(), "Parse error:");
-                    return Ok(Response::new(Body::from(error.to_string())))        
+                    return Ok(Response::new(Body::from(error.to_string())));
                 }
             }
         }

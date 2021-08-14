@@ -79,4 +79,22 @@ mod tests {
             actual
         );
     }
+
+    #[test]
+    fn test_symbols() {
+        let actual = parse("let test = :symbol").expect("parse error");
+        assert_eq!(
+            ast::Program {
+                block: ast::Block {
+                    statements: vec![ast::Statement::Binding {
+                        lhs: ast::Identifier("test".to_string()),
+                        rhs: ast::Expression::Term(ast::ExpressionTerm::Literal(
+                            ast::Literal::Symbol("symbol".to_string())
+                        ))
+                    }]
+                }
+            },
+            actual
+        );
+    }
 }

@@ -37,7 +37,8 @@ ExpressionTerm: ast::ExpressionTerm = {
 
 Literal: ast::Literal = {
   r"[0-9]+" => ast::Literal::Number(i64::from_str(<>).expect("parse error")),
-  r"'[^']*'" => ast::Literal::String(<>[1..<>.len()-1].to_string())
+  r"'[^']*'" => ast::Literal::String(<>[1..<>.len()-1].to_string()),
+  r":[a-zA-Z_]+" => ast::Literal::Symbol(<>[1..<>.len()].to_string())
 }
 
 Operator: ast::Operator = {

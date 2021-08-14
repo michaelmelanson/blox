@@ -21,7 +21,10 @@ fn id_key_from_collection_name(collection: &str) -> String {
     format!("{}_id", singular)
 }
 
-pub fn request_asset_path(method: &Method, uri: &Uri) -> Result<(AssetPath, Bindings), RoutingError> {
+pub fn request_asset_path(
+    method: &Method,
+    uri: &Uri,
+) -> Result<(AssetPath, Bindings), RoutingError> {
     let mut route_parts = Vec::new();
     let mut bindings = Vec::new();
 
@@ -36,32 +39,32 @@ pub fn request_asset_path(method: &Method, uri: &Uri) -> Result<(AssetPath, Bind
             match (method, parts.next()) {
                 (&Method::GET, None) => {
                     route_parts.push(RoutePathPart::Action(Action::Index));
-                },
+                }
 
                 (&Method::GET, Some("new")) => {
                     route_parts.push(RoutePathPart::Action(Action::New));
-                },
-                
+                }
+
                 (&Method::GET, Some(id)) => {
                     route_parts.push(RoutePathPart::Action(Action::Show));
                     bindings.push((id_key, id.to_string()));
-                },
+                }
 
                 (&Method::PUT, Some(id)) => {
                     route_parts.push(RoutePathPart::Action(Action::Update));
                     bindings.push((id_key, id.to_string()));
-                },
+                }
 
                 (&Method::DELETE, Some(id)) => {
                     route_parts.push(RoutePathPart::Action(Action::Delete));
                     bindings.push((id_key, id.to_string()));
-                },
+                }
 
                 (&Method::POST, None) => {
                     route_parts.push(RoutePathPart::Action(Action::Create));
-                },
+                }
 
-                (method, part) => unimplemented!("method={} part={:?}", method, part)
+                (method, part) => unimplemented!("method={} part={:?}", method, part),
             }
         }
     } else {
@@ -73,8 +76,8 @@ pub fn request_asset_path(method: &Method, uri: &Uri) -> Result<(AssetPath, Bind
 
 #[cfg(test)]
 mod test {
-    use hyper::{Uri, Method};
-    use blox_assets::types::{AssetPath, Bindings, RoutePathPart, Action};
+    use blox_assets::types::{Action, AssetPath, Bindings, RoutePathPart};
+    use hyper::{Method, Uri};
 
     use crate::request_asset_path;
 
@@ -88,17 +91,15 @@ mod test {
     #[test]
     fn test_request_asset_path() {
         assert_eq!(
-            request_asset_path(&Method::GET, &uri_with_path_and_query("/")), 
+            request_asset_path(&Method::GET, &uri_with_path_and_query("/")),
             Ok((
-                AssetPath::Route(vec![
-                    RoutePathPart::Action(Action::Index)
-                ]),
-                Bindings::default() 
+                AssetPath::Route(vec![RoutePathPart::Action(Action::Index)]),
+                Bindings::default()
             ))
         );
 
         assert_eq!(
-            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists")), 
+            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
@@ -109,20 +110,18 @@ mod test {
         );
 
         assert_eq!(
-            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists/1")), 
+            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists/1")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
                     RoutePathPart::Action(Action::Show)
                 ]),
-                Bindings::new(&vec![
-                    ("list_id".to_string(), "1".to_string())
-                ])
+                Bindings::new(&vec![("list_id".to_string(), "1".to_string())])
             ))
         );
 
         assert_eq!(
-            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists/new")), 
+            request_asset_path(&Method::GET, &uri_with_path_and_query("/lists/new")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
@@ -133,7 +132,7 @@ mod test {
         );
 
         assert_eq!(
-            request_asset_path(&Method::POST, &uri_with_path_and_query("/lists")), 
+            request_asset_path(&Method::POST, &uri_with_path_and_query("/lists")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
@@ -144,28 +143,24 @@ mod test {
         );
 
         assert_eq!(
-            request_asset_path(&Method::DELETE, &uri_with_path_and_query("/lists/1")), 
+            request_asset_path(&Method::DELETE, &uri_with_path_and_query("/lists/1")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
                     RoutePathPart::Action(Action::Delete)
                 ]),
-                Bindings::new(&vec![
-                    ("list_id".to_string(), "1".to_string())
-                ])
+                Bindings::new(&vec![("list_id".to_string(), "1".to_string())])
             ))
         );
 
         assert_eq!(
-            request_asset_path(&Method::PUT, &uri_with_path_and_query("/lists/1")), 
+            request_asset_path(&Method::PUT, &uri_with_path_and_query("/lists/1")),
             Ok((
                 AssetPath::Route(vec![
                     RoutePathPart::Collection("lists".to_string()),
                     RoutePathPart::Action(Action::Update)
                 ]),
-                Bindings::new(&vec![
-                    ("list_id".to_string(), "1".to_string())
-                ])
+                Bindings::new(&vec![("list_id".to_string(), "1".to_string())])
             ))
         );
     }

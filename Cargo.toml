@@ -3,5 +3,6 @@ members = [
   "blox-assets",
   "blox-interpreter",
   "blox-language",
+  "blox-persistence",
   "blox-server"
 ]
