@@ -4,11 +4,14 @@ use std::{
 };
 
 use blox_assets::{AssetError, AssetManager};
-use hyper::{
-    server::conn::AddrStream,
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use clap::{command, Parser};
+use std::net::SocketAddr;
+
+use http_body_util::Full;
+use hyper::{body::Bytes, server::conn::http1, service::service_fn, Request, Response};
+use hyper_util::rt::TokioIo;
+use tokio::net::TcpListener;
+
 use router::request_asset_path;
 use tracing::{error, info, instrument, metadata::LevelFilter};
 
@@ -18,77 +21,75 @@ mod router;
 use assets::{program::BloxProgram, template::Template};
 use blox_interpreter::{execute_program, Scope, Value};
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+#[command(propagate_version = true)]
+struct Args {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Parser)]
+enum Commands {
+    #[command(about = "Start a Blox server")]
+    Start {
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+        #[arg(default_value = ".")]
+        directory: String,
+    },
+}
+
 #[tokio::main]
 async fn main() {
-    let matches = clap::App::new("blox")
-        .version("1.0")
-        .author("Michael Melanson<michael@michaelmelanson.net")
-        .subcommand(
-            clap::SubCommand::with_name("start")
-                .about("Start a Blox server")
-                .arg(
-                    clap::Arg::with_name("PORT")
-                        .help("the port to bind to")
-                        .short("p")
-                        .long("port")
-                        .default_value("3000")
-                        .takes_value(true),
-                )
-                .arg(
-                    clap::Arg::with_name("DIRECTORY")
-                        .help("base path for the application")
-                        .default_value(".")
-                        .index(1),
-                ),
-        )
-        .get_matches();
+    let matches = Args::parse();
 
     tracing_subscriber::fmt()
         .with_max_level(LevelFilter::INFO)
         .init();
 
-    if let Some(matches) = matches.subcommand_matches("start") {
-        subcommand_run(matches).await.expect("run command failed");
-    } else {
-        println!("{}", matches.usage.unwrap());
+    match matches.command {
+        Commands::Start { port, directory } => {
+            start(port, directory).await.expect("start command failed");
+        }
     }
 }
 
-async fn subcommand_run<'a>(matches: &'a clap::ArgMatches<'a>) -> Result<(), anyhow::Error> {
-    let path = matches.value_of("DIRECTORY").unwrap();
-    let cache = AssetManager::new(path)?;
+async fn start(port: u16, path: String) -> Result<(), anyhow::Error> {
+    let cache = AssetManager::new(&path)?;
     let cache = Arc::new(Mutex::new(cache));
 
-    let port = matches
-        .value_of("PORT")
-        .map(|s| u16::from_str_radix(s, 10).expect("port must be a number"))
-        .expect("no port given");
-
-    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
-
-    let make_svc = make_service_fn(|_socket: &AddrStream| {
-        let cache = cache.clone();
-        async move {
-            Ok::<_, Infallible>(service_fn(move |req: Request<Body>| {
-                let cache = cache.clone();
-                async move { handle_request(req, cache).await }
-            }))
-        }
-    });
-
-    let server = Server::bind(&addr).serve(make_svc);
-
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let listener = TcpListener::bind(addr).await?;
     info!("Listening on http://{:?}", addr);
-    server.await?;
 
-    Ok(())
+    loop {
+        let (tcp, _) = listener.accept().await?;
+        let io = TokioIo::new(tcp);
+
+        let cache = cache.clone();
+
+        tokio::task::spawn(async move {
+            let service = service_fn(|req: Request<hyper::body::Incoming>| async {
+                handle_request(req, cache.clone()).await
+            });
+
+            if let Err(err) = http1::Builder::new()
+                // .timer(TokioTimer::new())
+                .serve_connection(io, service)
+                .await
+            {
+                println!("Error serving connection: {:?}", err);
+            }
+        });
+    }
 }
 
 #[instrument(skip(request, assets), fields(method, uri))]
 pub async fn handle_request(
-    request: Request<Body>,
+    request: Request<hyper::body::Incoming>,
     assets: Arc<Mutex<AssetManager>>,
-) -> anyhow::Result<Response<Body>> {
+) -> anyhow::Result<Response<Full<Bytes>>> {
     let method = request.method();
     let uri = request.uri();
 
@@ -117,7 +118,7 @@ pub async fn handle_request(
 
                 _ => {
                     error!(error = error.to_string().as_str(), "Parse error:");
-                    return Ok(Response::new(Body::from(error.to_string())));
+                    return Ok(Response::new(error.to_string().into()));
                 }
             }
         }
@@ -125,13 +126,13 @@ pub async fn handle_request(
 
     match assets.load::<Template>(&path) {
         Ok(template) => match template.render(&scope) {
-            Ok(body) => Ok(Response::new(Body::from(body))),
+            Ok(body) => Ok(Response::new(body.into())),
             Err(error) => {
                 error!(
                     error = error.to_string().as_str(),
                     "Error processing template"
                 );
-                Ok(Response::new(Body::from(error.to_string())))
+                Ok(Response::new(error.to_string().into()))
             }
         },
 
@@ -141,7 +142,7 @@ pub async fn handle_request(
                 "Error while running handler"
             );
 
-            Ok(Response::new(Body::from(error.to_string())))
+            Ok(Response::new(error.to_string().into()))
         }
     }
 }

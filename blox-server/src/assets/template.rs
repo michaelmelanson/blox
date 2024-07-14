@@ -41,7 +41,7 @@ impl blox_assets::Loader<Template> for TemplateLoader {
         let input = String::from_utf8(content.to_vec())?;
 
         if filename.ends_with(".html.hbs") {
-            let template = handlebars::Template::compile(input)
+            let template = handlebars::Template::compile(&input)
                 .map_err(|err| TemplateRenderError(format!("{}", err)))?;
 
             Ok(Template::Handlebars(template))

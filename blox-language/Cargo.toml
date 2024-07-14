@@ -2,13 +2,13 @@
 name = "blox-language"
 version = "0.1.0"
 authors = ["Michael Melanson <michael@michaelmelanson.net>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-lalrpop = "0.19"
+lalrpop = "0.20"
 
 [dependencies]
-lalrpop-util = "0.19"
+lalrpop-util = { version = "0.20", features = ["lexer"] }
 blox-assets = { path = "../blox-assets" }

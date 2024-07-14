@@ -7,18 +7,18 @@ lalrpop_mod!(pub program);
 pub type ParseError<'a> =
     lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, &'static str>;
 
+pub fn parse<'a>(code: &'a str) -> std::result::Result<ast::Program, ParseError<'a>> {
+    program::ProgramParser::new().parse(code)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::program;
-    use crate::{ast, ParseError};
-
-    fn parse(code: &str) -> std::result::Result<ast::Program, ParseError<'_>> {
-        program::ProgramParser::new().parse(code)
-    }
+    use crate::ast;
+    use crate::parse;
 
     #[test]
     fn parse_let_bindings() {
-        let actual = parse("let test = 55").expect("parse error");
+        let actual = parse(&"let test = 55".to_string()).expect("parse error");
         assert_eq!(
             ast::Program {
                 block: ast::Block {
@@ -36,7 +36,7 @@ mod tests {
 
     #[test]
     fn parse_expressions() {
-        let actual = parse("let test = 55 + 42").expect("parse error");
+        let actual = parse(&"let test = 55 + 42".to_string()).expect("parse error");
         assert_eq!(
             ast::Program {
                 block: ast::Block {
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_nested_expressions() {
-        let actual = parse("let test = (1 * 2) + 3").expect("parse error");
+        let actual = parse(&"let test = (1 * 2) + 3".to_string()).expect("parse error");
         assert_eq!(
             ast::Program {
                 block: ast::Block {
@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_symbols() {
-        let actual = parse("let test = :symbol").expect("parse error");
+        let actual = parse(&"let test = :symbol".to_string()).expect("parse error");
         assert_eq!(
             ast::Program {
                 block: ast::Block {

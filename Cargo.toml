@@ -1,8 +1,9 @@
 [workspace]
+resolver = "2"
 members = [
-  "blox-assets",
-  "blox-interpreter",
-  "blox-language",
-  "blox-persistence",
-  "blox-server"
+    "blox-assets",
+    "blox-interpreter",
+    "blox-language",
+    "blox-persistence",
+    "blox-server",
 ]

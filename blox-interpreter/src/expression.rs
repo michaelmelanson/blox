@@ -43,19 +43,40 @@ pub fn evaluate_expression_term(term: &ast::ExpressionTerm, scope: &Scope) -> Op
 
 #[cfg(test)]
 mod tests {
-    use blox_language::ast;
+    use blox_language::{
+        ast::{self, Expression},
+        parse, ParseError,
+    };
 
     use crate::{Scope, Value};
 
     use super::evaluate_expression;
 
+    fn parse_expression(expression_code: &str) -> Result<Expression, ParseError> {
+        let code = format!("let __TEST = {}", expression_code);
+        match parse(&code) {
+            Ok(program) => {
+                let statement = program.block.statements.first().expect("no statements");
+
+                match statement {
+                    ast::Statement::Binding { lhs: _, rhs } => Ok(rhs.clone()),
+        
+                    statement => panic!(
+                        "expression produced wrong kind of statement: {:?}",
+                        statement
+                    ),
+                }
+            },
+
+            Err(ref error) => {
+                Err(*error)
+            }
+        }
+    }
+
     #[test]
     fn test_evaluate_addition_identifier_literal() {
-        let expression = ast::Expression::Operator {
-            lhs: ast::ExpressionTerm::Identifier(ast::Identifier("x".to_string())),
-            operator: ast::Operator::Add,
-            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(1)),
-        };
+        let expression = parse_expression("x + 1").expect("parse error");
 
         let mut scope = Scope::default();
         scope.insert_binding("x".to_string(), Value::Number(55));
@@ -66,11 +87,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_addition_identifier_identifier() {
-        let expression = ast::Expression::Operator {
-            lhs: ast::ExpressionTerm::Identifier(ast::Identifier("x".to_string())),
-            operator: ast::Operator::Add,
-            rhs: ast::ExpressionTerm::Identifier(ast::Identifier("y".to_string())),
-        };
+        let expression = parse_expression("x + y").expect("parse error");
 
         let mut scope = Scope::default();
         scope.insert_binding("x".to_string(), Value::Number(55));
