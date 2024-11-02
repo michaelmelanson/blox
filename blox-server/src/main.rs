@@ -109,7 +109,7 @@ pub async fn handle_request(
 
     debug!(?path, "Loading asset");
     match path {
-        AssetPath::Route(ref vec) => {
+        AssetPath::Route(ref _vec) => {
             match assets.load::<BloxProgram>(&path) {
                 Ok(program) => {
                     execute_program(&program.into(), &mut scope)?;
