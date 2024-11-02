@@ -13,6 +13,7 @@
         pkgs.iconv
         pkgs.cargo-outdated
         pkgs.tailwindcss
+        pkgs.asciidoctor
         frameworks.SystemConfiguration
         frameworks.CoreServices
       ];
