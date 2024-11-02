@@ -4,8 +4,7 @@ pub mod ast;
 extern crate lalrpop_util;
 lalrpop_mod!(pub program);
 
-pub type ParseError<'a> =
-    lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, &'static str>;
+pub type ParseError<'a> = lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, &'a str>;
 
 pub fn parse<'a>(code: &'a str) -> std::result::Result<ast::Program, ParseError<'a>> {
     program::ProgramParser::new().parse(code)

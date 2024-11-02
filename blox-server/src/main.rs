@@ -1,11 +1,9 @@
-use std::{
-    convert::Infallible,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use blox_assets::{AssetError, AssetManager};
+use blox_assets::{types::AssetPath, AssetError, AssetManager};
 use clap::{command, Parser};
 use std::net::SocketAddr;
+use tracing_subscriber::EnvFilter;
 
 use http_body_util::Full;
 use hyper::{body::Bytes, server::conn::http1, service::service_fn, Request, Response};
@@ -13,12 +11,12 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 
 use router::request_asset_path;
-use tracing::{error, info, instrument, metadata::LevelFilter};
+use tracing::{debug, error, info, instrument, metadata::LevelFilter};
 
 mod assets;
 mod router;
 
-use assets::{program::BloxProgram, template::Template};
+use assets::{program::BloxProgram, static_file::StaticFile, template::Template};
 use blox_interpreter::{execute_program, Scope, Value};
 
 #[derive(Parser)]
@@ -45,7 +43,8 @@ async fn main() {
     let matches = Args::parse();
 
     tracing_subscriber::fmt()
-        .with_max_level(LevelFilter::INFO)
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_max_level(LevelFilter::TRACE)
         .init();
 
     match matches.command {
@@ -99,6 +98,8 @@ pub async fn handle_request(
 
     let (path, bindings) = request_asset_path(request.method(), request.uri())?;
 
+    info!(?path, "Requesting asset");
+
     let mut assets = assets.lock().unwrap();
 
     let mut scope = Scope::default();
@@ -106,43 +107,53 @@ pub async fn handle_request(
         scope.insert_binding(name.clone(), Value::String(value))
     }
 
-    match assets.load::<BloxProgram>(&path) {
-        Ok(program) => {
-            execute_program(&program.into(), &mut scope)?;
-        }
+    debug!(?path, "Loading asset");
+    match path {
+        AssetPath::Route(ref vec) => {
+            match assets.load::<BloxProgram>(&path) {
+                Ok(program) => {
+                    execute_program(&program.into(), &mut scope)?;
+                }
 
-        Err(error) => {
-            match error.downcast_ref::<AssetError>() {
-                // ignore this, just means there's no Blox code
-                Some(AssetError::NoMatchingExtension(_, _)) => {}
+                Err(error) => {
+                    match error.downcast_ref::<AssetError>() {
+                        // ignore this, just means there's no Blox code
+                        Some(AssetError::NoMatchingExtension(_, _)) => {}
 
-                _ => {
-                    error!(error = error.to_string().as_str(), "Parse error:");
-                    return Ok(Response::new(error.to_string().into()));
+                        _ => {
+                            error!(error = error.to_string().as_str(), "Parse error:");
+                            return Ok(Response::new(error.to_string().into()));
+                        }
+                    }
+                }
+            }
+
+            match assets.load::<Template>(&path) {
+                Ok(template) => match template.render(&scope) {
+                    Ok(body) => Ok(Response::new(body.into())),
+                    Err(error) => {
+                        error!(
+                            error = error.to_string().as_str(),
+                            "Error processing template"
+                        );
+                        Ok(Response::new(error.to_string().into()))
+                    }
+                },
+
+                Err(error) => {
+                    error!(
+                        error = error.to_string().as_str(),
+                        "Error while running handler"
+                    );
+
+                    Ok(Response::new(error.to_string().into()))
                 }
             }
         }
-    }
-
-    match assets.load::<Template>(&path) {
-        Ok(template) => match template.render(&scope) {
-            Ok(body) => Ok(Response::new(body.into())),
-            Err(error) => {
-                error!(
-                    error = error.to_string().as_str(),
-                    "Error processing template"
-                );
-                Ok(Response::new(error.to_string().into()))
-            }
-        },
-
-        Err(error) => {
-            error!(
-                error = error.to_string().as_str(),
-                "Error while running handler"
-            );
-
-            Ok(Response::new(error.to_string().into()))
+        AssetPath::Static(_) => {
+            let asset = assets.load::<StaticFile>(&path)?;
+            Ok(asset.into())
         }
+        AssetPath::Layout(_) => todo!("layout routes"),
     }
 }

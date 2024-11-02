@@ -1,0 +1,38 @@
+= Blox design
+
+== Language
+
+=== Variables
+Variables are declared with `let`:
+
+  let x = 1
+
+
+=== Token streams
+Use backticks for SQL queries:
+
+  ```sql SELECT * FROM users WHERE id = {userId} ```.execute(db)
+
+=== String interpolation
+To produce templated output, use backticks, and surround expressions with curly braces:
+
+  html(`<h1>Welcome, {user.name}!</h1>`)
+
+=== Function calls
+Use named arguments:
+createUser(name: "Alice", age: 30)
+
+== Web framework
+
+=== Routing
+File-based routing in `app/routes` directory.
+Example: `app/routes/users/[id].blox` for `/users/123`
+
+=== Context
+Define shared objects in `app/context` files.
+Import with: `import { database, logger } from context`
+
+=== Form validation
+Import validation module:
+import { form, string, number } from "blox/validation"
+let userForm = form(name: string().required(), age: number().min(18))

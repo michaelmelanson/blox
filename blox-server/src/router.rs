@@ -1,5 +1,6 @@
 use blox_assets::types::{Action, AssetPath, Bindings, RoutePathPart};
 use hyper::{Method, Uri};
+use tracing::debug;
 
 #[derive(Debug, PartialEq)]
 pub enum RoutingError {}
@@ -29,8 +30,18 @@ pub fn request_asset_path(
     let mut bindings = Vec::new();
 
     let path = uri.path().trim_matches('/');
-    if !path.is_empty() {
-        let mut parts = path.split('/');
+    if path.is_empty() {
+        route_parts.push(RoutePathPart::Action(Action::Index));
+    } else {
+        let mut parts = path.split("/").collect::<Vec<_>>().into_iter().peekable();
+
+        if parts.peek() == Some(&"static") {
+            let static_path = parts.skip(1).collect::<Vec<_>>().join("/").to_string();
+            debug!(static_path, path, "static");
+
+            return Ok((AssetPath::Static(static_path), Bindings::default()));
+        }
+
         while let Some(collection) = parts.next() {
             route_parts.push(RoutePathPart::Collection(collection.to_string()));
 
@@ -67,8 +78,6 @@ pub fn request_asset_path(
                 (method, part) => unimplemented!("method={} part={:?}", method, part),
             }
         }
-    } else {
-        route_parts.push(RoutePathPart::Action(Action::Index));
     }
 
     Ok((AssetPath::Route(route_parts), Bindings::new(&bindings)))

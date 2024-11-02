@@ -45,14 +45,14 @@ pub fn evaluate_expression_term(term: &ast::ExpressionTerm, scope: &Scope) -> Op
 mod tests {
     use blox_language::{
         ast::{self, Expression},
-        parse, ParseError,
+        parse,
     };
 
     use crate::{Scope, Value};
 
     use super::evaluate_expression;
 
-    fn parse_expression(expression_code: &str) -> Result<Expression, ParseError> {
+    fn parse_expression<'a>(expression_code: String) -> Result<Expression, String> {
         let code = format!("let __TEST = {}", expression_code);
         match parse(&code) {
             Ok(program) => {
@@ -60,23 +60,20 @@ mod tests {
 
                 match statement {
                     ast::Statement::Binding { lhs: _, rhs } => Ok(rhs.clone()),
-        
                     statement => panic!(
                         "expression produced wrong kind of statement: {:?}",
                         statement
                     ),
                 }
-            },
-
-            Err(ref error) => {
-                Err(*error)
             }
+
+            Err(error) => Err(error.to_string()),
         }
     }
 
     #[test]
     fn test_evaluate_addition_identifier_literal() {
-        let expression = parse_expression("x + 1").expect("parse error");
+        let expression = parse_expression("x + 1".to_string()).expect("parse error");
 
         let mut scope = Scope::default();
         scope.insert_binding("x".to_string(), Value::Number(55));
@@ -87,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_addition_identifier_identifier() {
-        let expression = parse_expression("x + y").expect("parse error");
+        let expression = parse_expression("x + y".to_string()).expect("parse error");
 
         let mut scope = Scope::default();
         scope.insert_binding("x".to_string(), Value::Number(55));

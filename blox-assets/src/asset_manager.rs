@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::DirEntry,
-    path::{Component, PathBuf},
+    path::{Component, Components, PathBuf},
 };
 
 use tracing::{debug, error, info, info_span, instrument, warn};
@@ -36,7 +36,7 @@ impl AssetManager {
     pub fn start(&mut self) -> anyhow::Result<()> {
         self.reindex()?;
 
-        info!("after initial index: {:#?}", self.asset_index);
+        debug!("after initial index: {:#?}", self.asset_index);
         Ok(())
     }
 
@@ -52,7 +52,12 @@ impl AssetManager {
             let mut matching_path = None;
 
             for extension in T::EXTENSIONS {
-                if let Some(path) = file_paths.iter().find(|path| {
+                if extension == &"*" {
+                    if let Some(path) = file_paths.iter().next() {
+                        matching_path = Some((path, extension));
+                        break;
+                    }
+                } else if let Some(path) = file_paths.iter().find(|path| {
                     path.file_name()
                         .map(|f| f.to_string_lossy().ends_with(extension))
                         == Some(true)
@@ -93,39 +98,70 @@ impl AssetManager {
             }
 
             if let Ok(relative_path) = path.strip_prefix(&self.base_dir) {
-                let mut components = relative_path.components();
+                let components = relative_path.components();
 
-                match components.next() {
-                    Some(Component::Normal(c)) if c.to_str() == Some("routes") => {
-                        let mut route_path_parts = Vec::new();
-
-                        if let Some(action_component) = components.next_back() {
-                            let action = RoutePathPart::Action(Action::from(action_component));
-
-                            for component in components {
-                                let part = RoutePathPart::Collection(
-                                    component.as_os_str().to_str().unwrap().to_string(),
-                                );
-                                route_path_parts.push(part);
-                            }
-
-                            route_path_parts.push(action);
-                        } else {
-                            unimplemented!();
-                        }
-
-                        let asset_path = AssetPath::Route(route_path_parts);
-                        self.asset_index.entry(asset_path).or_default().insert(path);
-                    }
-
-                    Some(_) => info!("Unrecognized path: {:?}", relative_path),
-
-                    None => {}
-                }
+                self.reindex_file(components, &path)
             }
         }
 
         Ok(())
+    }
+
+    fn reindex_file(&mut self, mut components: Components, path: &PathBuf) {
+        if let Some(Component::Normal(c)) = components.next() {
+            match c.to_str() {
+                Some("app") => self.reindex_app_file(components, path),
+                _ => debug!("unrecognized top level file: {:?}", path),
+            }
+        }
+    }
+
+    fn reindex_app_file(&mut self, mut components: Components, path: &PathBuf) {
+        let Some(Component::Normal(c)) = components.next() else {
+            return;
+        };
+
+        match c.to_str() {
+            Some("routes") => self.reindex_routes_file(components, path),
+            Some("static") => {
+                // join together remoaining components to get the path
+                let static_asset_path = components.collect::<PathBuf>();
+                let static_asset_path = static_asset_path
+                    .to_str()
+                    .expect("path buf could not be converted to string");
+                let asset_path = AssetPath::Static(static_asset_path.to_string());
+
+                self.asset_index
+                    .entry(asset_path)
+                    .or_default()
+                    .insert(path.clone());
+            }
+            _ => debug!("unrecognized app file: {:?}", path),
+        }
+    }
+
+    fn reindex_routes_file(&mut self, mut components: Components, path: &PathBuf) {
+        let mut route_path_parts = Vec::new();
+
+        if let Some(action_component) = components.next_back() {
+            let action = RoutePathPart::Action(Action::from(action_component));
+
+            for component in components {
+                let part =
+                    RoutePathPart::Collection(component.as_os_str().to_str().unwrap().to_string());
+                route_path_parts.push(part);
+            }
+
+            route_path_parts.push(action);
+        } else {
+            unimplemented!();
+        }
+
+        let asset_path = AssetPath::Route(route_path_parts);
+        self.asset_index
+            .entry(asset_path)
+            .or_default()
+            .insert(path.clone());
     }
 
     pub fn add_root_entry(&mut self, entry: &DirEntry) -> anyhow::Result<()> {

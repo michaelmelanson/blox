@@ -1,0 +1,22 @@
+<html>
+<head>
+    <title>Home</title>
+    <link rel="stylesheet" type="text/css" href="/static/application.css">
+</head>
+<body class="mx-auto min-w-60 max-w-xl bg-gray-100">
+    <section class="">
+        <header class="p-4 w-">
+            <div class="container mx-auto">
+                <div class="flex flex-col items-center">
+                    <h1 class="text-8xl font-thin text-red-700 mb-5">todos</h1>
+                </div>
+            </div>
+            <form action="/todos" method="POST">
+                <div class="flex justify-center">
+                    <input type="text" name="title" class="text-2xl placeholder:italic placeholder:text-slate-400 font-thin w-full shadow-xl shadow-gray-200 focus:outline outline-2 outline-red-600 py-4 pr-4 pl-16" placeholder="What needs to be done?">
+                </div>
+            </form>
+        </header>
+    </section>
+</body>
+</html>

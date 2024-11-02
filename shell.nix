@@ -13,7 +13,9 @@ in pkgs.mkShell {
     pkgs.rustc
     pkgs.iconv
     pkgs.cargo-outdated
+    pkgs.tailwindcss
 
     frameworks.SystemConfiguration
+    frameworks.CoreServices
   ];
 }

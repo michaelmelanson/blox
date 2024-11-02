@@ -1,0 +1,4 @@
+Item.create(
+  text: "Buy milk",
+)
+redirect_to "/"
