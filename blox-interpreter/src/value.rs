@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use blox_language::ast;
 
 use crate::Scope;
