@@ -99,7 +99,6 @@ impl AssetManager {
 
             if let Ok(relative_path) = path.strip_prefix(&self.base_dir) {
                 let components = relative_path.components();
-
                 self.reindex_file(components, &path)
             }
         }
