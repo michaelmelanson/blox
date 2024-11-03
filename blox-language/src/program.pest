@@ -1,0 +1,26 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+program = { SOI ~ block ~ EOI }
+block = { statement* }
+
+statement = { (binding_statement|expression_statement) }
+
+expression_statement = { expression }
+binding_statement = { "let" ~ identifier ~ "=" ~ expression }
+
+expression = { expression_term ~ (operator ~ expression_term)? }
+expression_term = { (function_call | identifier | literal | "("~expression~")") }
+
+function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
+argument_list = _{ argument ~ ("," ~ argument)* }
+argument = { identifier ~ ":" ~ expression }
+
+identifier = { LETTER+ }
+literal = { number | string | symbol }
+number = @{ "-"? ~ NUMBER+ }
+string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+symbol = @{ ":" ~ LETTER+ }
+
+operator = { addition_operator | multiplication_operator }
+addition_operator = { "+" }
+multiplication_operator = { "*" }

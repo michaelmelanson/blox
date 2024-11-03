@@ -1,19 +1,20 @@
 use blox_language::ast;
 
-use crate::{expression::evaluate_expression, Scope};
+use crate::{expression::evaluate_expression, RuntimeError, Scope, Value};
 
-pub fn execute_statement(statement: &ast::Statement, scope: &mut Scope) {
+pub fn execute_statement(
+    statement: &ast::Statement,
+    scope: &mut Scope,
+) -> Result<Value, RuntimeError> {
     match statement {
-        ast::Statement::Binding { lhs, rhs } => {
-            if let Some(value) = evaluate_expression(rhs, &scope) {
-                scope.bindings.insert(lhs.clone(), value);
-            } else {
-                unimplemented!();
-            }
+        ast::Statement::Expression(expression) => {
+            let value = evaluate_expression(expression, scope)?;
+            Ok(value)
         }
-
-        ast::Statement::FunctionCall(_call) => {
-            unimplemented!()
+        ast::Statement::Binding { lhs, rhs } => {
+            let value = evaluate_expression(rhs, &scope)?;
+            scope.insert_binding(lhs, value.clone());
+            Ok(value)
         }
     }
 }

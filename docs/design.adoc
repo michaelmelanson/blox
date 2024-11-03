@@ -3,36 +3,77 @@
 == Language
 
 === Variables
-Variables are declared with `let`:
+When you need a variable in Blox, start with `let`. Your variables can't be changed after they're set, and Blox figures out their types automatically. Just remember to create them before you use them, and use a different name if you need another variable in the same area:
 
-  let x = 1
+```
+    let x = 1
+    let name = "Alice"
+    let active = true
+    let scores = [10, 20, 30]
+    let user = { name: "Bob", age: 25 }
+```
 
-
-=== Token streams
-Use backticks for SQL queries:
+=== Working with SQL
+When you need to run database queries, write them using backticks. You can include variables right in your query using curly braces:
 
   ```sql SELECT * FROM users WHERE id = {userId} ```.execute(db)
+  ```sql INSERT INTO users (name, age) VALUES ({user.name}, {user.age}) ```.execute(db)
+  ```sql UPDATE posts SET title = {title} WHERE author_id = {currentUser.id} ```.execute(db)
+
+You can store queries in variables and reuse them:
+
+  let activeUsersQuery = ```sql SELECT * FROM users WHERE active = true ```
+  let result = activeUsersQuery.execute(db)
+
+All queries are automatically protected against SQL injection attacks through proper parameter escaping.
 
 === String interpolation
-To produce templated output, use backticks, and surround expressions with curly braces:
+Need to insert values into text? It's easy! Just use backticks (`) and put your values inside curly braces {}. This works for any kind of text, whether it's HTML, messages, or file names:
 
+```
+  let greeting = `Hello, {user.name}!`
   html(`<h1>Welcome, {user.name}!</h1>`)
+  log(`User {id} logged in at {time}`)
+  let filename = `reports/{date}-{type}.csv`
+```
 
 === Function calls
-Use named arguments:
+When calling functions in Blox, you must use named arguments to make your code clearer and easier to understand. It's not optional - every argument needs a name followed by a colon and the value:
+
+```
 createUser(name: "Alice", age: 30)
+sendEmail(to: "bob@example.com", subject: "Hello", body: "Hi there!")
+updateSettings(theme: "dark", notifications: true, fontSize: 14)
+```
+
+This makes it obvious what each value means and helps prevent mistakes from mixing up the order of arguments.
 
 == Web framework
+Blox was built to make web development feel natural and easy. If you've done any web development before, you'll feel right at home. Everything is organized in a way that just makes sense for building web applications - from routing to forms to data access.
 
 === Routing
-File-based routing in `app/routes` directory.
-Example: `app/routes/users/[id].blox` for `/users/123`
+In Blox, creating routes is as simple as adding files to your `app/routes` directory. Each file automatically becomes a route based on its path and name. Here's how it works:
+
+- A file at `app/routes/about.blox` handles `/about` with GET
+- A file at `app/routes/users.blox` handles GET `/users`
+- A file at `app/routes/users/new.blox` handles GET `/users/new`
+- A file at `app/routes/users/create.blox` handles POST `/users`
+- For dynamic routes, use square brackets: `app/routes/users/[id].blox` handles paths like `/users/123`
+- A file at `app/routes/users/[id]/edit.blox` handles GET `/users/123/edit`
+- A file at `app/routes/users/[id]/update.blox` handles PUT `/users/123`
+- A file at `app/routes/users/[id]/delete.blox` handles DELETE `/users/123`
+
+The route's HTTP method is determined by the filename - `create` implies POST, `update` implies PUT, and so on. Regular files handle GET by default.
 
 === Context
-Define shared objects in `app/context` files.
-Import with: `import { database, logger } from context`
+Define shared objects in `app/context` files. Import with:
+```
+import { database, logger } from context
+```
 
 === Form validation
 Import validation module:
+```
 import { form, string, number } from "blox/validation"
 let userForm = form(name: string().required(), age: number().min(18))
+```

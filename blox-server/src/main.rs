@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use blox_assets::{types::AssetPath, AssetError, AssetManager};
+use blox_language::ast::Identifier;
 use clap::{command, Parser};
 use std::net::SocketAddr;
 use tracing_subscriber::EnvFilter;
@@ -104,7 +105,7 @@ pub async fn handle_request(
 
     let mut scope = Scope::default();
     for (name, value) in bindings {
-        scope.insert_binding(name.clone(), Value::String(value))
+        scope.insert_binding(&Identifier(name.clone()), Value::String(value))
     }
 
     debug!(?path, "Loading asset");

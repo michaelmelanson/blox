@@ -6,9 +6,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[build-dependencies]
-lalrpop = "0.20"
-
 [dependencies]
-lalrpop-util = { version = "0.20", features = ["lexer"] }
 blox-assets = { path = "../blox-assets" }
+pest = "2.7"
+pest_derive = "2.7"
