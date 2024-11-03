@@ -3,7 +3,7 @@ pub struct Program {
     pub block: Block,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Identifier(pub String);
 
 impl std::fmt::Display for Identifier {
@@ -12,7 +12,7 @@ impl std::fmt::Display for Identifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
@@ -29,8 +29,9 @@ impl std::fmt::Display for Block {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
+    Definition(Definition),
     Expression(Expression),
     Binding { lhs: Identifier, rhs: Expression },
 }
@@ -38,13 +39,46 @@ pub enum Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Statement::Definition(def) => write!(f, "{}", def),
             Statement::Expression(expr) => write!(f, "{}", expr),
             Statement::Binding { lhs, rhs } => write!(f, "let {} = {}", lhs.0, rhs),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Definition {
+    pub name: Identifier,
+    pub parameters: Vec<Parameter>,
+    pub body: Block,
+}
+
+impl std::fmt::Display for Definition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "def {}(", self.name)?;
+
+        for (i, param) in self.parameters.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+
+            write!(f, "{}", param)?;
+        }
+
+        write!(f, ") {}", self.body)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Parameter(pub Identifier);
+
+impl std::fmt::Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expression {
     Term(ExpressionTerm),
     Operator {
@@ -65,7 +99,7 @@ impl std::fmt::Display for Expression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExpressionTerm {
     FunctionCall(FunctionCall),
     Identifier(Identifier),
@@ -84,7 +118,7 @@ impl std::fmt::Display for ExpressionTerm {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     Number(i64),
     String(String),
@@ -101,7 +135,7 @@ impl std::fmt::Display for Literal {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operator {
     Add,
     Multiply,
@@ -116,7 +150,7 @@ impl std::fmt::Display for Operator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Argument {
     pub identifier: Identifier,
     pub value: Expression,
@@ -128,7 +162,7 @@ impl std::fmt::Display for Argument {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FunctionCall {
     pub identifier: Identifier,
     pub arguments: Vec<Argument>,

@@ -1,12 +1,16 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 program = { SOI ~ block ~ EOI }
-block = { statement* }
+block = { statement ~ ("\n" ~ statement)* }
 
-statement = { (binding_statement|expression_statement) }
+statement = { (definition_statement|binding_statement|expression_statement) }
 
-expression_statement = { expression }
 binding_statement = { "let" ~ identifier ~ "=" ~ expression }
+expression_statement = { expression }
+
+definition_statement = { "def" ~ identifier ~ "(" ~ parameter_list? ~ ")" ~ "{" ~ block ~ "}" }
+parameter_list = _{ parameter ~ ("," ~ parameter)* }
+parameter = { identifier }
 
 expression = { expression_term ~ (operator ~ expression_term)? }
 expression_term = { (function_call | identifier | literal | "("~expression~")") }

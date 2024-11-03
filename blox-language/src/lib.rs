@@ -71,6 +71,10 @@ fn parse_statement(
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
+            parser::Rule::definition_statement => {
+                let definition = parse_definition(inner_pair)?;
+                result = Some(ast::Statement::Definition(definition));
+            }
             parser::Rule::binding_statement => {
                 let (lhs, rhs) = parse_binding(inner_pair)?;
                 result = Some(ast::Statement::Binding { lhs, rhs });
@@ -84,6 +88,45 @@ fn parse_statement(
     }
 
     Ok(result.expect("expected statement"))
+}
+
+fn parse_definition(
+    pair: pest::iterators::Pair<parser::Rule>,
+) -> std::result::Result<ast::Definition, ParseError> {
+    let mut name = None;
+    let mut parameters = vec![];
+    let mut body = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            parser::Rule::identifier => {
+                name = Some(parse_identifier(inner_pair)?);
+            }
+            parser::Rule::parameter => {
+                parameters.push(parse_parameter(inner_pair)?);
+            }
+            parser::Rule::block => {
+                body = Some(parse_block(inner_pair)?);
+            }
+            rule => unimplemented!("definition rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::Definition {
+        name: name.expect("expected name"),
+        parameters,
+        body: body.expect("expected body"),
+    })
+}
+
+fn parse_parameter(
+    pair: pest::iterators::Pair<parser::Rule>,
+) -> std::result::Result<ast::Parameter, ParseError> {
+    let inner_pair = pair.into_inner().next().expect("expected inner pair");
+    match inner_pair.as_rule() {
+        parser::Rule::identifier => Ok(ast::Parameter(parse_identifier(inner_pair)?)),
+        rule => unimplemented!("parameter rule: {rule:?}"),
+    }
 }
 
 fn parse_binding(
@@ -174,6 +217,9 @@ fn parse_expression_term(
         parser::Rule::expression => Ok(ast::ExpressionTerm::Expression(Box::new(
             parse_expression(inner_pair)?,
         ))),
+        parser::Rule::function_call => Ok(ast::ExpressionTerm::FunctionCall(parse_function_call(
+            inner_pair,
+        )?)),
         rule => unimplemented!("term expression rule: {rule:?}"),
     }
 }
@@ -207,6 +253,54 @@ fn parse_literal(
         parser::Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
         rule => unimplemented!("literal rule: {rule:?}"),
     }
+}
+
+fn parse_function_call(
+    pair: pest::iterators::Pair<parser::Rule>,
+) -> std::result::Result<ast::FunctionCall, ParseError> {
+    let mut identifier = None;
+    let mut arguments = vec![];
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            parser::Rule::identifier => {
+                identifier = Some(parse_identifier(inner_pair)?);
+            }
+            parser::Rule::argument => {
+                arguments.push(parse_argument(inner_pair)?);
+            }
+            rule => unimplemented!("function call rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::FunctionCall {
+        identifier: identifier.expect("expected function name"),
+        arguments,
+    })
+}
+
+fn parse_argument(
+    pair: pest::iterators::Pair<parser::Rule>,
+) -> std::result::Result<ast::Argument, ParseError> {
+    let mut identifier = None;
+    let mut value = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            parser::Rule::identifier => {
+                identifier = Some(parse_identifier(inner_pair)?);
+            }
+            parser::Rule::expression => {
+                value = Some(parse_expression(inner_pair)?);
+            }
+            rule => unimplemented!("argument rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::Argument {
+        identifier: identifier.expect("expected argument name"),
+        value: value.expect("expected argument value"),
+    })
 }
 
 #[cfg(test)]

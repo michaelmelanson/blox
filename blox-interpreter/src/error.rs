@@ -12,6 +12,10 @@ pub enum RuntimeError {
         rhs_expression: ast::ExpressionTerm,
         rhs_value: Value,
     },
+    NotAFunction {
+        identifier: ast::Identifier,
+        value: Value,
+    },
 }
 
 impl std::error::Error for RuntimeError {}
@@ -34,6 +38,9 @@ impl std::fmt::Display for RuntimeError {
                     f,
                     "invalid operands: {operator} cannot be used for {lhs_expression} (={lhs_value}) and {rhs_expression} (={rhs_value})"
                 )
+            }
+            RuntimeError::NotAFunction { identifier, value } => {
+                write!(f, "{identifier} is not a function: {value}")
             }
         }
     }

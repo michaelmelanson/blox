@@ -1,6 +1,6 @@
 use blox_language::ast;
 
-use crate::{RuntimeError, Scope, Value};
+use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
 pub fn evaluate_expression(
     expression: &ast::Expression,
@@ -43,7 +43,7 @@ pub fn evaluate_expression_term(
     scope: &Scope,
 ) -> Result<Value, RuntimeError> {
     match term {
-        ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier.0).cloned(),
+        ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier).cloned(),
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Ok(Value::Number(*number)),
         ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
             Ok(Value::String(string.clone()))
@@ -52,16 +52,41 @@ pub fn evaluate_expression_term(
             Ok(Value::Symbol(string.clone()))
         }
         ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, scope),
-        ast::ExpressionTerm::FunctionCall(function_call) => todo!("function call"),
+        ast::ExpressionTerm::FunctionCall(function_call) => {
+            evaluate_function_call(function_call, scope)
+        }
+    }
+}
+
+pub fn evaluate_function_call(
+    function_call: &ast::FunctionCall,
+    scope: &Scope,
+) -> Result<Value, RuntimeError> {
+    let function = scope.get_binding(&function_call.identifier)?;
+
+    match function {
+        Value::Function(definition, function_scope) => {
+            let mut call_scope = function_scope.clone();
+
+            for (parameter, argument) in definition.parameters.iter().zip(&function_call.arguments)
+            {
+                let value = evaluate_expression(&argument.value, scope)?;
+                call_scope.insert_binding(&parameter.0, value);
+            }
+
+            evaluate_block(&definition.body, &mut call_scope)
+        }
+        _ => Err(RuntimeError::NotAFunction {
+            identifier: function_call.identifier.clone(),
+            value: function.clone(),
+        }),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use blox_language::{
-        ast::{self, Expression, Identifier},
-        parse,
-        parser::{self, Rule},
+        ast::{Expression, Identifier},
         ParseError,
     };
 

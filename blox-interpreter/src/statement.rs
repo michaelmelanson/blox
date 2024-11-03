@@ -16,5 +16,10 @@ pub fn execute_statement(
             scope.insert_binding(lhs, value.clone());
             Ok(value)
         }
+        ast::Statement::Definition(definition) => {
+            let function = Value::Function(definition.clone(), scope.clone());
+            scope.insert_binding(&definition.name, function.clone());
+            Ok(function)
+        }
     }
 }

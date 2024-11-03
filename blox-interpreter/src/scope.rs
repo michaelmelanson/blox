@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use blox_language::ast;
 
 use crate::{value::Value, RuntimeError};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Eq, PartialEq, Clone, Hash)]
 pub struct Scope {
-    pub bindings: HashMap<ast::Identifier, Value>,
+    pub bindings: BTreeMap<ast::Identifier, Value>,
 }
 
 impl Scope {
@@ -20,9 +20,9 @@ impl Scope {
         self.bindings.insert(name.clone(), value);
     }
 
-    pub fn get_binding(&self, name: &str) -> Result<&Value, RuntimeError> {
+    pub fn get_binding(&self, name: &ast::Identifier) -> Result<&Value, RuntimeError> {
         self.bindings
-            .get(&ast::Identifier(name.to_string()))
+            .get(&name)
             .ok_or(RuntimeError::UndefinedVariable(name.to_string()))
     }
 }
