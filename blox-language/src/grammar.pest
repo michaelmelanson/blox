@@ -1,7 +1,7 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 program = { SOI ~ block ~ EOI }
-block = { statement ~ ("\n" ~ statement)* }
+block = { statement* }
 
 statement = { (definition_statement|binding_statement|expression_statement) }
 
@@ -19,7 +19,7 @@ function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
 argument_list = _{ argument ~ ("," ~ argument)* }
 argument = { identifier ~ ":" ~ expression }
 
-identifier = { LETTER+ }
+identifier = { (LETTER|"_")+ }
 literal = { number | string | symbol }
 number = @{ "-"? ~ NUMBER+ }
 string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }

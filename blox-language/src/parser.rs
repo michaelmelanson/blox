@@ -1,5 +1,5 @@
 use pest_derive::Parser;
 
 #[derive(Parser)]
-#[grammar = "program.pest"]
+#[grammar = "grammar.pest"]
 pub struct BloxParser;

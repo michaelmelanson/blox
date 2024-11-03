@@ -20,6 +20,7 @@ impl From<pest::error::Error<parser::Rule>> for ParseError {
 
 pub fn parse(code: &str) -> std::result::Result<ast::Program, ParseError> {
     let mut result = parser::BloxParser::parse(parser::Rule::program, code)?;
+    println!("Parse result: {result}");
     assert_eq!(result.len(), 1);
 
     let Some(pair) = result.next() else {
