@@ -22,9 +22,10 @@ argument = { identifier ~ ":" ~ expression }
 identifier = { (LETTER|"_")+ }
 literal = { number | string | symbol }
 number = @{ "-"? ~ NUMBER+ }
-string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+string = @{ ("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'") }
 symbol = @{ ":" ~ LETTER+ }
 
-operator = { addition_operator | multiplication_operator }
+operator = { concatenation_operator | addition_operator | multiplication_operator }
+concatenation_operator = { "++" }
 addition_operator = { "+" }
 multiplication_operator = { "*" }

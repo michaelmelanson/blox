@@ -238,6 +238,7 @@ fn parse_operator(
     match inner_pair.as_rule() {
         parser::Rule::addition_operator => Ok(ast::Operator::Add),
         parser::Rule::multiplication_operator => Ok(ast::Operator::Multiply),
+        parser::Rule::concatenation_operator => Ok(ast::Operator::Concatenate),
         rule => unimplemented!("operator rule: {rule:?}"),
     }
 }
@@ -250,6 +251,13 @@ fn parse_literal(
         parser::Rule::number => {
             let number = inner_pair.as_str().parse().expect("expected number");
             Ok(ast::Literal::Number(number))
+        }
+        parser::Rule::string => {
+            let s = inner_pair.as_str();
+            // strip off the quotes at either end
+            let s = s.get(1..s.len() - 1).expect("expected inner pair");
+
+            Ok(ast::Literal::String(s.to_string()))
         }
         parser::Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
         rule => unimplemented!("literal rule: {rule:?}"),

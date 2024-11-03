@@ -39,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn test_let() {
+    fn test_let_numbers() {
         assert_result(
             "
             let x = 42
@@ -66,6 +66,35 @@ mod tests {
             x
             ",
             Value::Number(55),
+        );
+    }
+
+    #[test]
+    fn test_let_strings() {
+        assert_result(
+            "
+            let x = \"hello\"
+            ",
+            Value::String("hello".to_string()),
+        );
+        assert_result(
+            "
+            let x = 'hello'
+            ",
+            Value::String("hello".to_string()),
+        );
+        assert_result(
+            "
+            'hello' ++ ' world'
+            ",
+            Value::String("hello world".to_string()),
+        );
+        assert_result(
+            "
+            let x = 'hello'
+            x ++ ' world'
+            ",
+            Value::String("hello world".to_string()),
         );
     }
 

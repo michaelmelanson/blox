@@ -12,27 +12,24 @@ pub fn evaluate_expression(
             let lhs_value = evaluate_expression_term(lhs, scope)?;
             let rhs_value = evaluate_expression_term(rhs, scope)?;
 
-            match operator {
-                ast::Operator::Add => match (&lhs_value, &rhs_value) {
-                    (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs + rhs)),
-                    _ => Err(RuntimeError::InvalidOperands {
-                        lhs_expression: lhs.clone(),
-                        lhs_value,
-                        operator: operator.clone(),
-                        rhs_expression: rhs.clone(),
-                        rhs_value,
-                    }),
-                },
-                ast::Operator::Multiply => match (&lhs_value, &rhs_value) {
-                    (Value::Number(lhs), Value::Number(rhs)) => Ok(Value::Number(lhs * rhs)),
-                    _ => Err(RuntimeError::InvalidOperands {
-                        lhs_expression: lhs.clone(),
-                        lhs_value,
-                        operator: operator.clone(),
-                        rhs_expression: rhs.clone(),
-                        rhs_value,
-                    }),
-                },
+            match (lhs_value, operator, rhs_value) {
+                (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
+                    Ok(Value::Number(lhs + rhs))
+                }
+                (Value::Number(lhs), ast::Operator::Multiply, Value::Number(rhs)) => {
+                    Ok(Value::Number(lhs * rhs))
+                }
+                (Value::String(lhs), ast::Operator::Concatenate, Value::String(rhs)) => {
+                    Ok(Value::String(format!("{lhs}{rhs}")))
+                }
+
+                (lhs_value, operator, rhs_value) => Err(RuntimeError::InvalidOperands {
+                    lhs_expression: lhs.clone(),
+                    lhs_value,
+                    operator: operator.clone(),
+                    rhs_expression: rhs.clone(),
+                    rhs_value,
+                }),
             }
         }
     }

@@ -139,6 +139,7 @@ impl std::fmt::Display for Literal {
 pub enum Operator {
     Add,
     Multiply,
+    Concatenate,
 }
 
 impl std::fmt::Display for Operator {
@@ -146,6 +147,7 @@ impl std::fmt::Display for Operator {
         match self {
             Operator::Add => write!(f, "+"),
             Operator::Multiply => write!(f, "+"),
+            Operator::Concatenate => write!(f, "++"),
         }
     }
 }
