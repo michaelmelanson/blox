@@ -4,6 +4,8 @@ use ast::{Expression, Operator};
 use parser::{BloxParser, Rule};
 use pest::{pratt_parser::PrattParser, Parser};
 
+use lazy_static::lazy_static;
+
 pub mod ast;
 pub mod parser;
 
@@ -113,19 +115,12 @@ fn parse_definition(pair: pest::iterators::Pair<Rule>) -> Result<ast::Definition
     })
 }
 
-fn parse_parameter(pair: pest::iterators::Pair<Rule>) -> Result<ast::Parameter, ParseError> {
-    let inner_pair = pair.into_inner().next().expect("expected inner pair");
-    match inner_pair.as_rule() {
-        Rule::identifier => Ok(ast::Parameter(parse_identifier(inner_pair)?)),
-        rule => unimplemented!("parameter rule: {rule:?}"),
-    }
-}
-
 fn parse_binding(
     pair: pest::iterators::Pair<Rule>,
 ) -> Result<(ast::Identifier, ast::Expression), ParseError> {
     let mut lhs = None;
     let mut rhs = None;
+
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
             Rule::identifier => {
@@ -152,7 +147,7 @@ pub fn parse_expression_string(code: &str) -> Result<ast::Expression, ParseError
     parse_expression(pair)
 }
 
-lazy_static::lazy_static! {
+lazy_static! {
     static ref EXPRESSION_PARSER: PrattParser<Rule> = {
         use pest::pratt_parser::{Assoc::*, Op};
         use Rule::*;
