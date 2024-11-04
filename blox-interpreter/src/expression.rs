@@ -1,4 +1,6 @@
-use blox_language::ast;
+use std::collections::BTreeMap;
+
+use blox_language::ast::{self, ArrayIndex, Object, ObjectIndex};
 
 use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
@@ -8,9 +10,9 @@ pub fn evaluate_expression(
 ) -> Result<Value, RuntimeError> {
     match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, scope),
-        ast::Expression::Operator { lhs, operator, rhs } => {
-            let lhs_value = evaluate_expression_term(lhs, scope)?;
-            let rhs_value = evaluate_expression_term(rhs, scope)?;
+        ast::Expression::Operator(lhs, operator, rhs) => {
+            let lhs_value = evaluate_expression(lhs, scope)?;
+            let rhs_value = evaluate_expression(rhs, scope)?;
 
             match (lhs_value, operator, rhs_value) {
                 (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
@@ -24,10 +26,10 @@ pub fn evaluate_expression(
                 }
 
                 (lhs_value, operator, rhs_value) => Err(RuntimeError::InvalidOperands {
-                    lhs_expression: lhs.clone(),
+                    lhs_expression: *lhs.clone(),
                     lhs_value,
                     operator: operator.clone(),
-                    rhs_expression: rhs.clone(),
+                    rhs_expression: *rhs.clone(),
                     rhs_value,
                 }),
             }
@@ -52,6 +54,70 @@ pub fn evaluate_expression_term(
         ast::ExpressionTerm::FunctionCall(function_call) => {
             evaluate_function_call(function_call, scope)
         }
+        ast::ExpressionTerm::Array(array) => {
+            let mut members = Vec::new();
+            for member_expression in array.0.iter() {
+                let value = evaluate_expression(member_expression, scope)?;
+                members.push(value);
+            }
+            Ok(Value::Array(members))
+        }
+        ast::ExpressionTerm::ArrayIndex(ArrayIndex { array, index }) => {
+            let array_value = evaluate_expression_term(array, scope)?;
+            let index_value = evaluate_expression(index, scope)?;
+
+            match (&array_value, &index_value) {
+                (Value::Array(ref members), Value::Number(idx)) => {
+                    let idx = *idx as usize;
+                    if idx < members.len() {
+                        Ok(members[idx].clone())
+                    } else {
+                        Err(RuntimeError::ArrayIndexOutOfBounds {
+                            array_expression: *array.clone(),
+                            array_value: array_value.clone(),
+                            index_expression: *index.clone(),
+                            index_value: index_value.clone(),
+                        })
+                    }
+                }
+                (array_value, index_value) => Err(RuntimeError::InvalidArrayIndex {
+                    array_expression: *array.clone(),
+                    array_value: array_value.clone(),
+                    index_expression: *index.clone(),
+                    index_value: index_value.clone(),
+                }),
+            }
+        }
+        ast::ExpressionTerm::Object(Object(members)) => {
+            let mut object = BTreeMap::new();
+            for (key, value_expression) in members.iter() {
+                let value = evaluate_expression(value_expression, scope)?;
+                object.insert(key.clone(), value);
+            }
+            Ok(Value::Object(object))
+        }
+        ast::ExpressionTerm::ObjectIndex(ObjectIndex { object, key }) => {
+            let object_value = evaluate_expression_term(object, scope)?;
+
+            match object_value {
+                Value::Object(ref members) => {
+                    if let Some(value) = members.get(key) {
+                        Ok(value.clone())
+                    } else {
+                        Err(RuntimeError::ObjectKeyNotFound {
+                            object_expression: *object.clone(),
+                            object_value: object_value.clone(),
+                            key: key.clone(),
+                        })
+                    }
+                }
+                object_value => Err(RuntimeError::NotAnObject {
+                    object_expression: *object.clone(),
+                    object_value: object_value.clone(),
+                    key: key.clone(),
+                }),
+            }
+        }
     }
 }
 
@@ -59,22 +125,21 @@ pub fn evaluate_function_call(
     function_call: &ast::FunctionCall,
     scope: &Scope,
 ) -> Result<Value, RuntimeError> {
-    let function = scope.get_binding(&function_call.identifier)?;
+    let function = scope.get_binding(&function_call.0)?;
 
     match function {
         Value::Function(definition, function_scope) => {
             let mut call_scope = function_scope.clone();
 
-            for (parameter, argument) in definition.parameters.iter().zip(&function_call.arguments)
-            {
-                let value = evaluate_expression(&argument.value, scope)?;
+            for (parameter, argument) in definition.parameters.iter().zip(&function_call.1) {
+                let value = evaluate_expression(&argument.1, scope)?;
                 call_scope.insert_binding(&parameter.0, value);
             }
 
             evaluate_block(&definition.body, &mut call_scope)
         }
         _ => Err(RuntimeError::NotAFunction {
-            identifier: function_call.identifier.clone(),
+            identifier: function_call.0.clone(),
             value: function.clone(),
         }),
     }

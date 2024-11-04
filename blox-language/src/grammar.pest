@@ -1,31 +1,39 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
+identifier = { (LETTER|"_")+ }
+number = @{ "-"? ~ NUMBER+ }
+string = @{ ("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'") }
+symbol = @{ ":" ~ LETTER+ }
+
 program = { SOI ~ block ~ EOI }
 block = { statement* }
 
-statement = { (definition_statement|binding_statement|expression_statement) }
+statement = { (definition|binding|expression) }
 
-binding_statement = { "let" ~ identifier ~ "=" ~ expression }
-expression_statement = { expression }
+binding = { "let" ~ identifier ~ "=" ~ expression }
+definition = { "def" ~ identifier ~ "(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")" ~ "{" ~ block ~ "}" }
 
-definition_statement = { "def" ~ identifier ~ "(" ~ parameter_list? ~ ")" ~ "{" ~ block ~ "}" }
-parameter_list = _{ parameter ~ ("," ~ parameter)* }
-parameter = { identifier }
+expression = { expression_term ~ (operator ~ expression_term)* }
+expression_term = { (array_index | object_index | function_call | value | "("~expression~")") }
 
-expression = { expression_term ~ (operator ~ expression_term)? }
-expression_term = { (function_call | identifier | literal | "("~expression~")") }
+value = _{ identifier | array | object | literal }
 
 function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
 argument_list = _{ argument ~ ("," ~ argument)* }
 argument = { identifier ~ ":" ~ expression }
 
-identifier = { (LETTER|"_")+ }
 literal = { number | string | symbol }
-number = @{ "-"? ~ NUMBER+ }
-string = @{ ("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'") }
-symbol = @{ ":" ~ LETTER+ }
 
-operator = { concatenation_operator | addition_operator | multiplication_operator }
-concatenation_operator = { "++" }
-addition_operator = { "+" }
-multiplication_operator = { "*" }
+array = { "[" ~ array_members? ~ "]" }
+array_members = _{ expression ~ ("," ~ expression)* }
+array_index = { (function_call | identifier | array) ~ "[" ~ expression ~ "]" }
+
+object = { "{" ~ object_members? ~ "}" }
+object_members = _{ object_member ~ ("," ~ object_member)* }
+object_member = { identifier ~ ":" ~ expression }
+object_index = { (function_call | identifier | object) ~ "." ~ identifier }
+
+operator = _{ multiply | concatenate | add }
+concatenate = { "++" }
+add = { "+" }
+multiply = { "*" }

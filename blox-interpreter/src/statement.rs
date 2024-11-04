@@ -11,7 +11,7 @@ pub fn execute_statement(
             let value = evaluate_expression(expression, scope)?;
             Ok(value)
         }
-        ast::Statement::Binding { lhs, rhs } => {
+        ast::Statement::Binding(lhs, rhs) => {
             let value = evaluate_expression(rhs, &scope)?;
             scope.insert_binding(lhs, value.clone());
             Ok(value)

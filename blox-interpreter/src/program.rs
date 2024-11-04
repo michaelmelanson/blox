@@ -3,13 +3,13 @@ use blox_language::ast;
 use crate::{statement::execute_statement, RuntimeError, Scope, Value};
 
 pub fn execute_program(program: &ast::Program, scope: &mut Scope) -> Result<Value, RuntimeError> {
-    evaluate_block(&program.block, scope)
+    evaluate_block(&program.0, scope)
 }
 
 pub fn evaluate_block(block: &ast::Block, scope: &mut Scope) -> Result<Value, RuntimeError> {
     let mut value = Value::Void;
 
-    for statement in &block.statements {
+    for statement in &block.0 {
         value = execute_statement(statement, scope)?;
     }
 
@@ -32,10 +32,41 @@ mod tests {
         let result = execute_program(&program, &mut scope);
 
         match &result {
-            Ok(value) => assert_eq!(value, &expected),
+            Ok(value) => assert_eq!(
+                value, &expected,
+                "Expected: {expected}, got: {value}\nInput: {code}\nAST: {program:?}"
+            ),
             Err(e) => panic!("Execution error: {}", e),
         }
         assert_eq!(result, Ok(expected));
+    }
+
+    #[test]
+    fn test_expressions() {
+        assert_result(
+            "
+            1 + 2 + 3
+            ",
+            Value::Number(6),
+        );
+        assert_result(
+            "
+            1 + 2 * 3
+            ",
+            Value::Number(7),
+        );
+        assert_result(
+            "
+            (1 + 2) * 3
+            ",
+            Value::Number(9),
+        );
+        assert_result(
+            "
+            1 + 2 * 3 + 4
+            ",
+            Value::Number(11),
+        );
     }
 
     #[test]
@@ -67,6 +98,15 @@ mod tests {
             ",
             Value::Number(55),
         );
+        assert_result(
+            "
+            let x = 50
+            let y = 5
+            let z = 123
+            x + y + z
+            ",
+            Value::Number(178),
+        )
     }
 
     #[test]
@@ -95,6 +135,135 @@ mod tests {
             x ++ ' world'
             ",
             Value::String("hello world".to_string()),
+        );
+    }
+
+    #[test]
+    fn test_let_arrays() {
+        assert_result(
+            "
+            let x = [1, 2, 3]
+            ",
+            Value::Array(vec![Value::Number(1), Value::Number(2), Value::Number(3)]),
+        );
+        assert_result(
+            "
+            let x = [1 + 1, 2 + 2, 3 + 3]
+            ",
+            Value::Array(vec![Value::Number(2), Value::Number(4), Value::Number(6)]),
+        );
+        assert_result(
+            "
+            let x = [1, 2, 3]
+            x[1]
+            ",
+            Value::Number(2),
+        );
+        assert_result(
+            "
+            let x = [1, 2, 3]
+            x[0] + x[2]
+            ",
+            Value::Number(4),
+        );
+        assert_result(
+            "
+            def numbers() { [1, 2, 3] }
+            numbers()[2]
+            ",
+            Value::Number(3),
+        );
+        assert_result(
+            "
+            [4, 5, 6][1]
+            ",
+            Value::Number(5),
+        );
+    }
+
+    #[test]
+    fn test_objects() {
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            ",
+            Value::Object(
+                [
+                    ("a".to_string(), Value::Number(1)),
+                    ("b".to_string(), Value::Number(2)),
+                ]
+                .into(),
+            ),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a
+            ",
+            Value::Number(1),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.b
+            ",
+            Value::Number(2),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b
+            ",
+            Value::Number(3),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + 3
+            ",
+            Value::Number(4),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + 3
+            ",
+            Value::Number(6),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + x.a
+            ",
+            Value::Number(4),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + x.b
+            ",
+            Value::Number(5),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + x.a + x.b
+            ",
+            Value::Number(6),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + x.a + x.b + 3
+            ",
+            Value::Number(9),
+        );
+        assert_result(
+            "
+            let x = { a: 1, b: 2 }
+            x.a + x.b + x.a + x.b + x.a
+            ",
+            Value::Number(7),
         );
     }
 

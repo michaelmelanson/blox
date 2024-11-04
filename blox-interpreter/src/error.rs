@@ -6,15 +6,37 @@ use crate::Value;
 pub enum RuntimeError {
     UndefinedVariable(String),
     InvalidOperands {
-        lhs_expression: ast::ExpressionTerm,
+        lhs_expression: ast::Expression,
         lhs_value: Value,
         operator: ast::Operator,
-        rhs_expression: ast::ExpressionTerm,
+        rhs_expression: ast::Expression,
         rhs_value: Value,
+    },
+    InvalidArrayIndex {
+        array_expression: ast::ExpressionTerm,
+        array_value: Value,
+        index_expression: ast::Expression,
+        index_value: Value,
+    },
+    ArrayIndexOutOfBounds {
+        array_expression: ast::ExpressionTerm,
+        array_value: Value,
+        index_expression: ast::Expression,
+        index_value: Value,
     },
     NotAFunction {
         identifier: ast::Identifier,
         value: Value,
+    },
+    NotAnObject {
+        object_expression: ast::ExpressionTerm,
+        object_value: Value,
+        key: String,
+    },
+    ObjectKeyNotFound {
+        object_expression: ast::ExpressionTerm,
+        object_value: Value,
+        key: String,
     },
 }
 
@@ -41,6 +63,42 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::NotAFunction { identifier, value } => {
                 write!(f, "{identifier} is not a function: {value}")
+            }
+            RuntimeError::InvalidArrayIndex {
+                array_expression,
+                array_value,
+                index_expression,
+                index_value,
+            } => {
+                write!(f, "invalid array index: {array_expression} (={array_value})[{index_expression} (={index_value})]")
+            }
+            RuntimeError::ArrayIndexOutOfBounds {
+                array_expression,
+                array_value,
+                index_expression,
+                index_value,
+            } => {
+                write!(f, "array index out of bounds: {array_expression} (={array_value})[{index_expression} (={index_value})]")
+            }
+            RuntimeError::NotAnObject {
+                object_expression,
+                object_value,
+                key,
+            } => {
+                write!(
+                    f,
+                    "{object_expression} (={object_value}) is not an object: {key}"
+                )
+            }
+            RuntimeError::ObjectKeyNotFound {
+                object_expression,
+                object_value,
+                key,
+            } => {
+                write!(
+                    f,
+                    "object key not found: {object_expression} (={object_value}).{key}"
+                )
             }
         }
     }

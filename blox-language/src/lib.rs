@@ -1,10 +1,14 @@
-use pest::Parser;
+use std::result::Result;
+
+use ast::{Expression, Operator};
+use parser::{BloxParser, Rule};
+use pest::{pratt_parser::PrattParser, Parser};
 
 pub mod ast;
 pub mod parser;
 
 #[derive(Debug)]
-pub struct ParseError(pest::error::Error<parser::Rule>);
+pub struct ParseError(pest::error::Error<Rule>);
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -12,15 +16,14 @@ impl std::fmt::Display for ParseError {
     }
 }
 
-impl From<pest::error::Error<parser::Rule>> for ParseError {
-    fn from(err: pest::error::Error<parser::Rule>) -> Self {
+impl From<pest::error::Error<Rule>> for ParseError {
+    fn from(err: pest::error::Error<Rule>) -> Self {
         ParseError(err)
     }
 }
 
-pub fn parse(code: &str) -> std::result::Result<ast::Program, ParseError> {
-    let mut result = parser::BloxParser::parse(parser::Rule::program, code)?;
-    println!("Parse result: {result}");
+pub fn parse(code: &str) -> Result<ast::Program, ParseError> {
+    let mut result = BloxParser::parse(Rule::program, code)?;
     assert_eq!(result.len(), 1);
 
     let Some(pair) = result.next() else {
@@ -30,58 +33,50 @@ pub fn parse(code: &str) -> std::result::Result<ast::Program, ParseError> {
     Ok(parse_program(pair)?)
 }
 
-fn parse_program(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Program, ParseError> {
+fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<ast::Program, ParseError> {
     let mut block = None;
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::block => {
+            Rule::block => {
                 block = Some(parse_block(inner_pair)?);
             }
-            parser::Rule::EOI => {}
+            Rule::EOI => {}
             rule => unimplemented!("program rule: {rule:?}"),
         }
     }
 
-    Ok(ast::Program {
-        block: block.expect("expected block"),
-    })
+    Ok(ast::Program(block.expect("expected block")))
 }
 
-fn parse_block(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Block, ParseError> {
+fn parse_block(pair: pest::iterators::Pair<Rule>) -> Result<ast::Block, ParseError> {
     let mut statements = vec![];
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::statement => {
+            Rule::statement => {
                 statements.push(parse_statement(inner_pair)?);
             }
             rule => unimplemented!("block rule: {rule:?}"),
         }
     }
 
-    Ok(ast::Block { statements })
+    Ok(ast::Block(statements))
 }
 
-fn parse_statement(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Statement, ParseError> {
+fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement, ParseError> {
     let mut result = None;
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::definition_statement => {
+            Rule::definition => {
                 let definition = parse_definition(inner_pair)?;
                 result = Some(ast::Statement::Definition(definition));
             }
-            parser::Rule::binding_statement => {
+            Rule::binding => {
                 let (lhs, rhs) = parse_binding(inner_pair)?;
-                result = Some(ast::Statement::Binding { lhs, rhs });
+                result = Some(ast::Statement::Binding(lhs, rhs));
             }
-            parser::Rule::expression_statement => {
-                let expression = parse_expression_statement(inner_pair)?;
+            Rule::expression => {
+                let expression = parse_expression(inner_pair)?;
                 result = Some(ast::Statement::Expression(expression));
             }
             rule => unimplemented!("statement rule: {rule:?}"),
@@ -91,22 +86,20 @@ fn parse_statement(
     Ok(result.expect("expected statement"))
 }
 
-fn parse_definition(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Definition, ParseError> {
+fn parse_definition(pair: pest::iterators::Pair<Rule>) -> Result<ast::Definition, ParseError> {
     let mut name = None;
     let mut parameters = vec![];
     let mut body = None;
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::identifier => {
+            Rule::identifier if name == None => {
                 name = Some(parse_identifier(inner_pair)?);
             }
-            parser::Rule::parameter => {
-                parameters.push(parse_parameter(inner_pair)?);
+            Rule::identifier => {
+                parameters.push(ast::Parameter(parse_identifier(inner_pair)?));
             }
-            parser::Rule::block => {
+            Rule::block => {
                 body = Some(parse_block(inner_pair)?);
             }
             rule => unimplemented!("definition rule: {rule:?}"),
@@ -120,27 +113,25 @@ fn parse_definition(
     })
 }
 
-fn parse_parameter(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Parameter, ParseError> {
+fn parse_parameter(pair: pest::iterators::Pair<Rule>) -> Result<ast::Parameter, ParseError> {
     let inner_pair = pair.into_inner().next().expect("expected inner pair");
     match inner_pair.as_rule() {
-        parser::Rule::identifier => Ok(ast::Parameter(parse_identifier(inner_pair)?)),
+        Rule::identifier => Ok(ast::Parameter(parse_identifier(inner_pair)?)),
         rule => unimplemented!("parameter rule: {rule:?}"),
     }
 }
 
 fn parse_binding(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<(ast::Identifier, ast::Expression), ParseError> {
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<(ast::Identifier, ast::Expression), ParseError> {
     let mut lhs = None;
     let mut rhs = None;
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::identifier => {
+            Rule::identifier => {
                 lhs = Some(parse_identifier(inner_pair)?);
             }
-            parser::Rule::expression => {
+            Rule::expression => {
                 rhs = Some(parse_expression(inner_pair)?);
             }
             rule => unimplemented!("binding rule: {rule:?}"),
@@ -150,166 +141,257 @@ fn parse_binding(
     Ok((lhs.expect("expected lhs"), rhs.expect("expected rhs")))
 }
 
-fn parse_expression_statement(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Expression, ParseError> {
-    let inner_pair = pair.into_inner().next().expect("expected inner pair");
-    match inner_pair.as_rule() {
-        parser::Rule::expression => parse_expression(inner_pair),
-        rule => unimplemented!("expression statement rule: {rule:?}"),
-    }
-}
-
-pub fn parse_expression_string(code: &str) -> std::result::Result<ast::Expression, ParseError> {
-    let mut result = parser::BloxParser::parse(parser::Rule::expression, code)?;
-    println!("Parse result: {result}");
+pub fn parse_expression_string(code: &str) -> Result<ast::Expression, ParseError> {
+    let mut result = BloxParser::parse(Rule::expression, code)?;
     assert_eq!(result.len(), 1);
 
     let Some(pair) = result.next() else {
-        panic!("expected a single expression rule, found none");
+        unreachable!("expected a single expression rule, found none");
     };
 
     parse_expression(pair)
 }
 
-fn parse_expression(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Expression, ParseError> {
-    let mut lhs = None;
-    let mut operator = None;
-    let mut rhs = None;
+lazy_static::lazy_static! {
+    static ref EXPRESSION_PARSER: PrattParser<Rule> = {
+        use pest::pratt_parser::{Assoc::*, Op};
+        use Rule::*;
 
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            parser::Rule::expression_term => {
-                if lhs == None {
-                    lhs = Some(parse_expression_term(inner_pair)?);
-                } else if rhs == None {
-                    rhs = Some(parse_expression_term(inner_pair)?);
-                } else {
-                    unimplemented!("unexpected expression term");
-                }
-            }
-            parser::Rule::operator => {
-                operator = Some(parse_operator(inner_pair)?);
-            }
-            rule => unimplemented!("expression rule: {rule:?}"),
-        }
-    }
+        // Precedence is defined lowest to highest
+        PrattParser::new()
+            .op(Op::infix(add, Left) | Op::infix(concatenate, Left))
+            .op(Op::infix(multiply, Left))
+    };
+}
 
-    if let Some(operator) = operator {
-        let lhs = lhs.expect("expected lhs");
-        let rhs = rhs.expect("expected rhs");
-        Ok(ast::Expression::Operator { lhs, operator, rhs })
-    } else {
-        Ok(ast::Expression::Term(lhs.expect("expected term")))
-    }
+fn parse_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression, ParseError> {
+    EXPRESSION_PARSER
+        .map_primary(|primary| match primary.as_rule() {
+            Rule::expression_term => Ok(ast::Expression::Term(parse_expression_term(primary)?)),
+            rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+        })
+        .map_infix(|lhs, op, rhs| {
+            let op = match op.as_rule() {
+                Rule::add => Operator::Add,
+                Rule::multiply => Operator::Multiply,
+                Rule::concatenate => Operator::Concatenate,
+                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
+            };
+            Ok(Expression::Operator(Box::new(lhs?), op, Box::new(rhs?)))
+        })
+        .parse(pair.into_inner())
 }
 
 fn parse_expression_term(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::ExpressionTerm, ParseError> {
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<ast::ExpressionTerm, ParseError> {
     let inner_pair = pair.into_inner().next().expect("expected inner pair");
     match inner_pair.as_rule() {
-        parser::Rule::literal => Ok(ast::ExpressionTerm::Literal(parse_literal(inner_pair)?)),
-        parser::Rule::identifier => Ok(ast::ExpressionTerm::Identifier(parse_identifier(
+        Rule::literal => Ok(ast::ExpressionTerm::Literal(parse_literal(inner_pair)?)),
+        Rule::identifier => Ok(ast::ExpressionTerm::Identifier(parse_identifier(
             inner_pair,
         )?)),
-        parser::Rule::expression => Ok(ast::ExpressionTerm::Expression(Box::new(
-            parse_expression(inner_pair)?,
-        ))),
-        parser::Rule::function_call => Ok(ast::ExpressionTerm::FunctionCall(parse_function_call(
+        Rule::expression => Ok(ast::ExpressionTerm::Expression(Box::new(parse_expression(
+            inner_pair,
+        )?))),
+        Rule::function_call => Ok(ast::ExpressionTerm::FunctionCall(parse_function_call(
+            inner_pair,
+        )?)),
+        Rule::array => Ok(ast::ExpressionTerm::Array(parse_array(inner_pair)?)),
+        Rule::array_index => Ok(ast::ExpressionTerm::ArrayIndex(parse_array_index(
+            inner_pair,
+        )?)),
+        Rule::object => Ok(ast::ExpressionTerm::Object(parse_object(inner_pair)?)),
+        Rule::object_index => Ok(ast::ExpressionTerm::ObjectIndex(parse_object_index(
             inner_pair,
         )?)),
         rule => unimplemented!("term expression rule: {rule:?}"),
     }
 }
 
-fn parse_identifier(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Identifier, ParseError> {
+fn parse_identifier(pair: pest::iterators::Pair<Rule>) -> Result<ast::Identifier, ParseError> {
     Ok(ast::Identifier(pair.as_str().trim().to_string()))
 }
 
-fn parse_operator(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Operator, ParseError> {
+fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<ast::Literal, ParseError> {
     let inner_pair = pair.into_inner().next().expect("expected inner pair");
     match inner_pair.as_rule() {
-        parser::Rule::addition_operator => Ok(ast::Operator::Add),
-        parser::Rule::multiplication_operator => Ok(ast::Operator::Multiply),
-        parser::Rule::concatenation_operator => Ok(ast::Operator::Concatenate),
-        rule => unimplemented!("operator rule: {rule:?}"),
-    }
-}
-
-fn parse_literal(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Literal, ParseError> {
-    let inner_pair = pair.into_inner().next().expect("expected inner pair");
-    match inner_pair.as_rule() {
-        parser::Rule::number => {
+        Rule::number => {
             let number = inner_pair.as_str().parse().expect("expected number");
             Ok(ast::Literal::Number(number))
         }
-        parser::Rule::string => {
+        Rule::string => {
             let s = inner_pair.as_str();
             // strip off the quotes at either end
             let s = s.get(1..s.len() - 1).expect("expected inner pair");
 
             Ok(ast::Literal::String(s.to_string()))
         }
-        parser::Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
+        Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
         rule => unimplemented!("literal rule: {rule:?}"),
     }
 }
 
-fn parse_function_call(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::FunctionCall, ParseError> {
+fn parse_function_call(pair: pest::iterators::Pair<Rule>) -> Result<ast::FunctionCall, ParseError> {
     let mut identifier = None;
     let mut arguments = vec![];
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::identifier => {
+            Rule::identifier => {
                 identifier = Some(parse_identifier(inner_pair)?);
             }
-            parser::Rule::argument => {
+            Rule::argument => {
                 arguments.push(parse_argument(inner_pair)?);
             }
             rule => unimplemented!("function call rule: {rule:?}"),
         }
     }
 
-    Ok(ast::FunctionCall {
-        identifier: identifier.expect("expected function name"),
+    Ok(ast::FunctionCall(
+        identifier.expect("expected function name"),
         arguments,
+    ))
+}
+
+fn parse_array(pair: pest::iterators::Pair<Rule>) -> Result<ast::Array, ParseError> {
+    let mut members = vec![];
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::expression => {
+                members.push(parse_expression(inner_pair)?);
+            }
+            rule => unimplemented!("array rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::Array(members))
+}
+
+fn parse_array_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ArrayIndex, ParseError> {
+    let mut array = None;
+    let mut index = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::identifier if array == None => {
+                array = Some(ast::ExpressionTerm::Identifier(parse_identifier(
+                    inner_pair,
+                )?));
+            }
+            Rule::function_call if array == None => {
+                array = Some(ast::ExpressionTerm::FunctionCall(parse_function_call(
+                    inner_pair,
+                )?));
+            }
+            Rule::array if index == None => {
+                array = Some(ast::ExpressionTerm::Array(parse_array(inner_pair)?));
+            }
+            Rule::expression if index == None => {
+                index = Some(parse_expression(inner_pair)?);
+            }
+            rule => unreachable!("unexpected {rule:?}"),
+        }
+    }
+
+    Ok(ast::ArrayIndex {
+        array: Box::new(array.expect("expected array name")),
+        index: Box::new(index.expect("expected array index")),
     })
 }
 
-fn parse_argument(
-    pair: pest::iterators::Pair<parser::Rule>,
-) -> std::result::Result<ast::Argument, ParseError> {
+fn parse_object(pair: pest::iterators::Pair<Rule>) -> Result<ast::Object, ParseError> {
+    let mut members = vec![];
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::object_member => {
+                members.push(parse_object_member(inner_pair)?);
+            }
+            rule => unreachable!("object rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::Object(members))
+}
+
+fn parse_object_member(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<(String, Expression), ParseError> {
+    let mut key = None;
+    let mut value = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::identifier => {
+                key = Some(inner_pair.as_str().trim().to_string());
+            }
+            Rule::expression => {
+                value = Some(parse_expression(inner_pair)?);
+            }
+            rule => unreachable!("object member rule: {rule:?}"),
+        }
+    }
+
+    Ok((
+        key.expect("expected object key"),
+        value.expect("expected object value"),
+    ))
+}
+
+fn parse_object_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ObjectIndex, ParseError> {
+    let mut object = None;
+    let mut key = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::identifier if object == None => {
+                object = Some(ast::ExpressionTerm::Identifier(parse_identifier(
+                    inner_pair,
+                )?));
+            }
+            Rule::function_call if object == None => {
+                object = Some(ast::ExpressionTerm::FunctionCall(parse_function_call(
+                    inner_pair,
+                )?));
+            }
+            Rule::object if object == None => {
+                object = Some(ast::ExpressionTerm::Object(parse_object(inner_pair)?));
+            }
+            Rule::identifier if key == None => {
+                key = Some(inner_pair.as_str().trim().to_string());
+            }
+            rule => unreachable!("unexpected {rule:?}"),
+        }
+    }
+
+    Ok(ast::ObjectIndex {
+        object: Box::new(object.expect("expected object name")),
+        key: key.expect("expected object key"),
+    })
+}
+
+fn parse_argument(pair: pest::iterators::Pair<Rule>) -> Result<ast::Argument, ParseError> {
     let mut identifier = None;
     let mut value = None;
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
-            parser::Rule::identifier => {
+            Rule::identifier => {
                 identifier = Some(parse_identifier(inner_pair)?);
             }
-            parser::Rule::expression => {
+            Rule::expression => {
                 value = Some(parse_expression(inner_pair)?);
             }
-            rule => unimplemented!("argument rule: {rule:?}"),
+            rule => unreachable!("argument rule: {rule:?}"),
         }
     }
 
-    Ok(ast::Argument {
-        identifier: identifier.expect("expected argument name"),
-        value: value.expect("expected argument value"),
-    })
+    Ok(ast::Argument(
+        identifier.expect("expected argument name"),
+        value.expect("expected argument value"),
+    ))
 }
 
 #[cfg(test)]
@@ -321,16 +403,10 @@ mod tests {
     fn parse_let_bindings() {
         let actual = parse(&"let test = 55".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program {
-                block: ast::Block {
-                    statements: vec![ast::Statement::Binding {
-                        lhs: ast::Identifier("test".to_string()),
-                        rhs: ast::Expression::Term(ast::ExpressionTerm::Literal(
-                            ast::Literal::Number(55)
-                        ))
-                    }]
-                }
-            },
+            ast::Program(ast::Block(vec![ast::Statement::Binding(
+                ast::Identifier("test".to_string()),
+                ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(55)))
+            )])),
             actual
         );
     }
@@ -339,18 +415,18 @@ mod tests {
     fn parse_expressions() {
         let actual = parse(&"let test = 55 + 42".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program {
-                block: ast::Block {
-                    statements: vec![ast::Statement::Binding {
-                        lhs: ast::Identifier("test".to_string()),
-                        rhs: ast::Expression::Operator {
-                            lhs: ast::ExpressionTerm::Literal(ast::Literal::Number(55)),
-                            operator: ast::Operator::Add,
-                            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(42))
-                        }
-                    }]
-                }
-            },
+            ast::Program(ast::Block(vec![ast::Statement::Binding(
+                ast::Identifier("test".to_string()),
+                ast::Expression::Operator(
+                    Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                        ast::Literal::Number(55)
+                    ))),
+                    ast::Operator::Add,
+                    Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                        ast::Literal::Number(42)
+                    )))
+                )
+            )])),
             actual
         );
     }
@@ -359,24 +435,26 @@ mod tests {
     fn test_nested_expressions() {
         let actual = parse(&"let test = (1 * 2) + 3".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program {
-                block: ast::Block {
-                    statements: vec![ast::Statement::Binding {
-                        lhs: ast::Identifier("test".to_string()),
-                        rhs: ast::Expression::Operator {
-                            lhs: ast::ExpressionTerm::Expression(Box::new(
-                                ast::Expression::Operator {
-                                    lhs: ast::ExpressionTerm::Literal(ast::Literal::Number(1)),
-                                    operator: ast::Operator::Multiply,
-                                    rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(2))
-                                }
-                            )),
-                            operator: ast::Operator::Add,
-                            rhs: ast::ExpressionTerm::Literal(ast::Literal::Number(3))
-                        }
-                    }]
-                }
-            },
+            ast::Program(ast::Block(vec![ast::Statement::Binding(
+                ast::Identifier("test".to_string()),
+                ast::Expression::Operator(
+                    Box::new(ast::Expression::Term(ast::ExpressionTerm::Expression(
+                        Box::new(ast::Expression::Operator(
+                            Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                                ast::Literal::Number(1)
+                            ))),
+                            ast::Operator::Multiply,
+                            Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                                ast::Literal::Number(2)
+                            )))
+                        ))
+                    ))),
+                    ast::Operator::Add,
+                    Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                        ast::Literal::Number(3)
+                    )))
+                )
+            )])),
             actual
         );
     }
@@ -385,16 +463,12 @@ mod tests {
     fn test_symbols() {
         let actual = parse(&"let test = :symbol".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program {
-                block: ast::Block {
-                    statements: vec![ast::Statement::Binding {
-                        lhs: ast::Identifier("test".to_string()),
-                        rhs: ast::Expression::Term(ast::ExpressionTerm::Literal(
-                            ast::Literal::Symbol(":symbol".to_string())
-                        ))
-                    }]
-                }
-            },
+            ast::Program(ast::Block(vec![ast::Statement::Binding(
+                ast::Identifier("test".to_string()),
+                ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Symbol(
+                    ":symbol".to_string()
+                )))
+            )])),
             actual
         );
     }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use blox_language::ast;
 
 use crate::Scope;
@@ -9,22 +11,43 @@ pub enum Value {
     String(String),
     Symbol(String),
     Function(ast::Definition, Scope),
+    Array(Vec<Value>),
+    Object(BTreeMap<String, Value>),
 }
 
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Value::Void => "(void)".to_string(),
-            Value::Number(number) => number.to_string(),
-            Value::String(string) => format!("'{string}'"),
-            Value::Symbol(symbol) => format!(":{}", symbol),
-            Value::Function(definition, _scope) => format!(
+        match self {
+            Value::Void => write!(f, "(void)"),
+            Value::Number(number) => write!(f, "{number}"),
+            Value::String(string) => write!(f, "'{string}'",),
+            Value::Symbol(symbol) => write!(f, ":{symbol}",),
+            Value::Function(definition, _scope) => write!(
+                f,
                 "<function: {}/{}>",
                 definition.name,
                 definition.parameters.len()
             ),
-        };
-
-        write!(f, "{}", s)
+            Value::Array(values) => {
+                write!(f, "[")?;
+                for (i, v) in values.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
+            }
+            Value::Object(fields) => {
+                write!(f, "{{")?;
+                for (i, (name, value)) in fields.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", name, value)?;
+                }
+                write!(f, "}}")
+            }
+        }
     }
 }

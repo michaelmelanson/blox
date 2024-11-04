@@ -1,7 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
-    pub block: Block,
-}
+pub struct Program(pub Block);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Identifier(pub String);
@@ -13,15 +11,13 @@ impl std::fmt::Display for Identifier {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Block {
-    pub statements: Vec<Statement>,
-}
+pub struct Block(pub Vec<Statement>);
 
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{")?;
 
-        for statement in &self.statements {
+        for statement in &self.0 {
             writeln!(f, "{}", statement)?;
         }
 
@@ -33,7 +29,7 @@ impl std::fmt::Display for Block {
 pub enum Statement {
     Definition(Definition),
     Expression(Expression),
-    Binding { lhs: Identifier, rhs: Expression },
+    Binding(Identifier, Expression),
 }
 
 impl std::fmt::Display for Statement {
@@ -41,7 +37,7 @@ impl std::fmt::Display for Statement {
         match self {
             Statement::Definition(def) => write!(f, "{}", def),
             Statement::Expression(expr) => write!(f, "{}", expr),
-            Statement::Binding { lhs, rhs } => write!(f, "let {} = {}", lhs.0, rhs),
+            Statement::Binding(lhs, rhs) => write!(f, "let {} = {}", lhs.0, rhs),
         }
     }
 }
@@ -81,18 +77,14 @@ impl std::fmt::Display for Parameter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expression {
     Term(ExpressionTerm),
-    Operator {
-        lhs: ExpressionTerm,
-        operator: Operator,
-        rhs: ExpressionTerm,
-    },
+    Operator(Box<Expression>, Operator, Box<Expression>),
 }
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::Term(v) => write!(f, "{}", v),
-            Expression::Operator { lhs, operator, rhs } => {
+            Expression::Operator(lhs, operator, rhs) => {
                 write!(f, "({} {} {})", lhs, operator, rhs)
             }
         }
@@ -104,17 +96,68 @@ pub enum ExpressionTerm {
     FunctionCall(FunctionCall),
     Identifier(Identifier),
     Literal(Literal),
+    Array(Array),
+    ArrayIndex(ArrayIndex),
+    Object(Object),
+    ObjectIndex(ObjectIndex),
     Expression(Box<Expression>),
 }
 
 impl std::fmt::Display for ExpressionTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExpressionTerm::FunctionCall(v) => write!(f, "{}", v),
-            ExpressionTerm::Identifier(v) => write!(f, "{}", v),
-            ExpressionTerm::Literal(v) => write!(f, "{}", v),
-            ExpressionTerm::Expression(v) => write!(f, "{}", v),
+            ExpressionTerm::FunctionCall(v) => write!(f, "{v}"),
+            ExpressionTerm::Identifier(v) => write!(f, "{v}"),
+            ExpressionTerm::Literal(v) => write!(f, "{v}"),
+            ExpressionTerm::Expression(v) => write!(f, "{v}"),
+            ExpressionTerm::Array(v) => write!(f, "{v}"),
+            ExpressionTerm::ArrayIndex(v) => write!(f, "{v}"),
+            ExpressionTerm::Object(v) => write!(f, "{v}"),
+            ExpressionTerm::ObjectIndex(v) => write!(f, "{v}"),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArrayIndex {
+    pub array: Box<ExpressionTerm>,
+    pub index: Box<Expression>,
+}
+
+impl std::fmt::Display for ArrayIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}[{}]", self.array, self.index)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Object(pub Vec<(String, Expression)>);
+
+impl std::fmt::Display for Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+
+        for (i, (key, value)) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+
+            write!(f, "{}: {}", key, value)?;
+        }
+
+        write!(f, "}}")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ObjectIndex {
+    pub object: Box<ExpressionTerm>,
+    pub key: String,
+}
+
+impl std::fmt::Display for ObjectIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.object, self.key)
     }
 }
 
@@ -136,6 +179,22 @@ impl std::fmt::Display for Literal {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Array(pub Vec<Expression>);
+
+impl std::fmt::Display for Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        for (i, member) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", member)?;
+        }
+        write!(f, "]")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operator {
     Add,
     Multiply,
@@ -153,28 +212,22 @@ impl std::fmt::Display for Operator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Argument {
-    pub identifier: Identifier,
-    pub value: Expression,
-}
+pub struct Argument(pub Identifier, pub Expression);
 
 impl std::fmt::Display for Argument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.identifier, self.value)
+        writeln!(f, "{}: {}", self.0, self.1)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FunctionCall {
-    pub identifier: Identifier,
-    pub arguments: Vec<Argument>,
-}
+pub struct FunctionCall(pub Identifier, pub Vec<Argument>);
 
 impl std::fmt::Display for FunctionCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}(", self.identifier)?;
-        let arg_count = self.arguments.len();
-        for (index, argument) in self.arguments.iter().enumerate() {
+        write!(f, "{}(", self.0)?;
+        let arg_count = self.1.len();
+        for (index, argument) in self.1.iter().enumerate() {
             if index != arg_count - 1 {
                 write!(f, "{}, ", argument)?;
             } else {
