@@ -43,6 +43,7 @@ pub fn evaluate_expression_term(
 ) -> Result<Value, RuntimeError> {
     match term {
         ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier).cloned(),
+        ast::ExpressionTerm::Literal(ast::Literal::Boolean(value)) => Ok(Value::Boolean(*value)),
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Ok(Value::Number(*number)),
         ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
             Ok(Value::String(string.clone()))

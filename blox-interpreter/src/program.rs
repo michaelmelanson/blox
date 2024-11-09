@@ -42,6 +42,12 @@ mod tests {
     }
 
     #[test]
+    fn test_boolean() {
+        assert_result("true", Value::Boolean(true));
+        assert_result("false", Value::Boolean(false));
+    }
+
+    #[test]
     fn test_expressions() {
         assert_result(
             "

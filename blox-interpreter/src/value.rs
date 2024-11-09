@@ -8,6 +8,7 @@ use crate::{module::Module, Scope};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Void,
+    Boolean(bool),
     Number(Decimal),
     String(String),
     Symbol(String),
@@ -22,6 +23,7 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Void => write!(f, "(void)"),
+            Value::Boolean(bool) => write!(f, "{bool}"),
             Value::Number(number) => write!(f, "{number}"),
             Value::String(string) => write!(f, "'{string}'",),
             Value::Symbol(symbol) => write!(f, ":{symbol}",),

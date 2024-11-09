@@ -1,6 +1,9 @@
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 identifier = { (LETTER|"_")+ }
+boolean = _{ boolean_true | boolean_false }
+boolean_true = { "true" }
+boolean_false = { "false" }
 number = @{ "-"? ~ NUMBER+ ~ ("." ~ NUMBER+)? }
 string = @{ ("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'") }
 symbol = @{ ":" ~ LETTER+ }
@@ -19,7 +22,7 @@ imported_symbol = { identifier ~ ("as" ~ identifier)? }
 expression = { expression_term ~ (operator ~ expression_term)* }
 expression_term = { (if_expression | array_index | object_index | function_call | value | "("~expression~")") }
 
-value = _{ identifier | array | object | literal }
+value = _{ literal | identifier | array | object }
 
 if_expression = { "if" ~ expression ~ "{" ~ block ~ "}" ~ ("else" ~ "{" ~ block ~ "}")? }
 
@@ -27,7 +30,7 @@ function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
 argument_list = _{ argument ~ ("," ~ argument)* }
 argument = { identifier ~ ":" ~ expression }
 
-literal = { number | string | symbol }
+literal = { boolean | number | string | symbol }
 
 array = { "[" ~ array_members? ~ "]" }
 array_members = _{ expression ~ ("," ~ expression)* }

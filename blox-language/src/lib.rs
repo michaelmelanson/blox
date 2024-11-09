@@ -274,6 +274,8 @@ fn parse_identifier(pair: pest::iterators::Pair<Rule>) -> Result<ast::Identifier
 fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<ast::Literal, ParseError> {
     let inner_pair = pair.into_inner().next().expect("expected inner pair");
     match inner_pair.as_rule() {
+        Rule::boolean_true => Ok(ast::Literal::Boolean(true)),
+        Rule::boolean_false => Ok(ast::Literal::Boolean(false)),
         Rule::number => {
             let number = Decimal::from_str_radix(inner_pair.as_str(), 10)?;
             Ok(ast::Literal::Number(number))
