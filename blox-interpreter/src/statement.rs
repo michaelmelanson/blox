@@ -1,6 +1,6 @@
 use blox_language::ast;
 
-use crate::{expression::evaluate_expression, RuntimeError, Scope, Value};
+use crate::{expression::evaluate_expression, module::load_module, RuntimeError, Scope, Value};
 
 pub fn execute_statement(
     statement: &ast::Statement,
@@ -17,9 +17,26 @@ pub fn execute_statement(
             Ok(value)
         }
         ast::Statement::Definition(definition) => {
-            let function = Value::Function(definition.clone(), scope.clone());
+            let closure = scope.clone();
+            let function = Value::Function(definition.clone(), closure);
             scope.insert_binding(&definition.name, function.clone());
             Ok(function)
+        }
+        ast::Statement::Import(import) => {
+            let module = load_module(&import.1)?;
+
+            for symbol in &import.0 {
+                let value = module.export(&symbol.0)?;
+                let name = if symbol.1 == None {
+                    symbol.0.clone()
+                } else {
+                    symbol.1.clone().unwrap()
+                };
+
+                scope.insert_binding(&name, value.clone());
+            }
+
+            Ok(Value::Module(module))
         }
     }
 }

@@ -1,5 +1,6 @@
 mod error;
 mod expression;
+mod module;
 mod program;
 mod scope;
 mod statement;

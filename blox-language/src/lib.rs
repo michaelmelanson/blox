@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 pub mod ast;
 pub mod parser;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParseError(pest::error::Error<Rule>);
 
 impl std::fmt::Display for ParseError {
@@ -77,6 +77,10 @@ fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement, 
                 let (lhs, rhs) = parse_binding(inner_pair)?;
                 result = Some(ast::Statement::Binding(lhs, rhs));
             }
+            Rule::import => {
+                let import = parse_import(inner_pair)?;
+                result = Some(ast::Statement::Import(import));
+            }
             Rule::expression => {
                 let expression = parse_expression(inner_pair)?;
                 result = Some(ast::Statement::Expression(expression));
@@ -134,6 +138,51 @@ fn parse_binding(
     }
 
     Ok((lhs.expect("expected lhs"), rhs.expect("expected rhs")))
+}
+
+pub fn parse_import(pair: pest::iterators::Pair<Rule>) -> Result<ast::Import, ParseError> {
+    let mut symbols = vec![];
+    let mut path = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::imported_symbol => {
+                symbols.push(parse_imported_symbol(inner_pair)?);
+            }
+            Rule::string => {
+                path = Some(parse_string(inner_pair)?);
+            }
+            rule => unimplemented!("import rule: {rule:?}"),
+        }
+    }
+
+    let path = path.expect("expected path");
+
+    Ok(ast::Import(symbols, path))
+}
+
+fn parse_imported_symbol(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<ast::ImportedSymbol, ParseError> {
+    let mut name = None;
+    let mut alias = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::identifier => {
+                if name == None {
+                    name = Some(parse_identifier(inner_pair)?);
+                } else {
+                    alias = Some(parse_identifier(inner_pair)?);
+                }
+            }
+            rule => unimplemented!("imported symbol rule: {rule:?}"),
+        }
+    }
+
+    let name = name.expect("expected name");
+
+    Ok(ast::ImportedSymbol(name, alias))
 }
 
 pub fn parse_expression_string(code: &str) -> Result<ast::Expression, ParseError> {
@@ -216,15 +265,21 @@ fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<ast::Literal, Pars
             Ok(ast::Literal::Number(number))
         }
         Rule::string => {
-            let s = inner_pair.as_str();
-            // strip off the quotes at either end
-            let s = s.get(1..s.len() - 1).expect("expected inner pair");
-
-            Ok(ast::Literal::String(s.to_string()))
+            let s = parse_string(inner_pair)?;
+            Ok(ast::Literal::String(s))
         }
         Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
         rule => unimplemented!("literal rule: {rule:?}"),
     }
+}
+
+fn parse_string(pair: pest::iterators::Pair<Rule>) -> Result<String, ParseError> {
+    let s = pair.as_str();
+
+    // strip off the quotes at either end
+    let s = s.get(1..s.len() - 1).expect("expected inner pair");
+
+    Ok(s.to_string())
 }
 
 fn parse_function_call(pair: pest::iterators::Pair<Rule>) -> Result<ast::FunctionCall, ParseError> {

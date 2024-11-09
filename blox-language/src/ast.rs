@@ -28,16 +28,18 @@ impl std::fmt::Display for Block {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Statement {
     Definition(Definition),
-    Expression(Expression),
     Binding(Identifier, Expression),
+    Import(Import),
+    Expression(Expression),
 }
 
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Definition(def) => write!(f, "{}", def),
-            Statement::Expression(expr) => write!(f, "{}", expr),
             Statement::Binding(lhs, rhs) => write!(f, "let {} = {}", lhs.0, rhs),
+            Statement::Import(import) => write!(f, "{}", import),
+            Statement::Expression(expr) => write!(f, "{}", expr),
         }
     }
 }
@@ -62,6 +64,38 @@ impl std::fmt::Display for Definition {
         }
 
         write!(f, ") {}", self.body)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Import(pub Vec<ImportedSymbol>, pub String);
+
+impl std::fmt::Display for Import {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "import {{")?;
+
+        for (i, symbol) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+
+            write!(f, "{}", symbol)?;
+        }
+
+        write!(f, "}} from \"{}\"", self.1)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ImportedSymbol(pub Identifier, pub Option<Identifier>);
+
+impl std::fmt::Display for ImportedSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(alias) = &self.1 {
+            write!(f, "{} as {}", self.0, alias)
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 

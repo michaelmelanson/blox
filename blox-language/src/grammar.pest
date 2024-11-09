@@ -8,10 +8,13 @@ symbol = @{ ":" ~ LETTER+ }
 program = { SOI ~ block ~ EOI }
 block = { statement* }
 
-statement = { (definition|binding|expression) }
+statement = { (definition|binding|import|expression) }
 
 binding = { "let" ~ identifier ~ "=" ~ expression }
 definition = { "def" ~ identifier ~ "(" ~ (identifier ~ ("," ~ identifier)*)? ~ ")" ~ "{" ~ block ~ "}" }
+
+import = { "import" ~ "{" ~ imported_symbol ~ ("," ~ imported_symbol)* ~ "}" ~ "from" ~ string }
+imported_symbol = { identifier ~ ("as" ~ identifier)? }
 
 expression = { expression_term ~ (operator ~ expression_term)* }
 expression_term = { (array_index | object_index | function_call | value | "("~expression~")") }

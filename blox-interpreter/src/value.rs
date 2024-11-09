@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use blox_language::ast;
 
-use crate::Scope;
+use crate::{module::Module, Scope};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
@@ -10,9 +10,11 @@ pub enum Value {
     Number(i64),
     String(String),
     Symbol(String),
-    Function(ast::Definition, Scope),
     Array(Vec<Value>),
     Object(BTreeMap<String, Value>),
+
+    Function(ast::Definition, Scope),
+    Module(Module),
 }
 
 impl std::fmt::Display for Value {
@@ -48,6 +50,7 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
+            Value::Module(module) => write!(f, "<module: {}>", module.path),
         }
     }
 }

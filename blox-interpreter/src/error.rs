@@ -1,9 +1,10 @@
-use blox_language::ast;
+use blox_language::{ast, ParseError};
 
-use crate::Value;
+use crate::{module::Module, Value};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RuntimeError {
+    ParseError(ParseError),
     UndefinedVariable(String),
     InvalidOperands {
         lhs_expression: ast::Expression,
@@ -38,6 +39,8 @@ pub enum RuntimeError {
         object_value: Value,
         key: String,
     },
+    ModuleNotFound(String),
+    ExportNotFound(Module, ast::Identifier),
 }
 
 impl std::error::Error for RuntimeError {}
@@ -45,6 +48,10 @@ impl std::error::Error for RuntimeError {}
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            RuntimeError::ParseError(error) => {
+                write!(f, "runtime parse error: {}", error)
+            }
+
             RuntimeError::UndefinedVariable(name) => {
                 write!(f, "undefined variable: {}", name)
             }
@@ -100,6 +107,18 @@ impl std::fmt::Display for RuntimeError {
                     "object key not found: {object_expression} (={object_value}).{key}"
                 )
             }
+            RuntimeError::ModuleNotFound(name) => {
+                write!(f, "module not found: {name}")
+            }
+            RuntimeError::ExportNotFound(module, identifier) => {
+                write!(f, "export not found in {}: {identifier}", module.path)
+            }
         }
+    }
+}
+
+impl From<ParseError> for RuntimeError {
+    fn from(error: ParseError) -> Self {
+        RuntimeError::ParseError(error)
     }
 }
