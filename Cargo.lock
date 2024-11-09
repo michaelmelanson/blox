@@ -185,7 +185,6 @@ dependencies = [
 name = "blox-interpreter"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "blox-language",
  "clap",
  "rust_decimal",

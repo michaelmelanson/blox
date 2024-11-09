@@ -8,8 +8,7 @@ edition = "2021"
 
 [dependencies]
 blox-language = { path = "../blox-language" }
-tracing = "0.1"
-anyhow = "1.0"
+tracing = { version = "0.1", default-features = false }
 clap = { version = "4.5.20", default-features = false, features = [
     "std",
     "derive",
