@@ -8,13 +8,14 @@
       frameworks = pkgs.darwin.apple_sdk.frameworks;
     in pkgs.mkShell {
       buildInputs = [
+        pkgs.asciidoctor
         pkgs.bash
         pkgs.cargo
-        pkgs.rustc
-        pkgs.iconv
         pkgs.cargo-outdated
+        pkgs.git
+        pkgs.iconv
+        pkgs.rustc
         pkgs.tailwindcss
-        pkgs.asciidoctor
         frameworks.SystemConfiguration
         frameworks.CoreServices
       ];
