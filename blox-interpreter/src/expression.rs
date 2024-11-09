@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
-use blox_language::ast::{self, ArrayIndex, Object, ObjectIndex};
+use blox_language::ast::{self, ArrayIndex, If, Object, ObjectIndex};
 
 use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
 pub fn evaluate_expression(
     expression: &ast::Expression,
-    scope: &Scope,
+    scope: &mut Scope,
 ) -> Result<Value, RuntimeError> {
     match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, scope),
@@ -39,7 +39,7 @@ pub fn evaluate_expression(
 
 pub fn evaluate_expression_term(
     term: &ast::ExpressionTerm,
-    scope: &Scope,
+    scope: &mut Scope,
 ) -> Result<Value, RuntimeError> {
     match term {
         ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier).cloned(),
@@ -126,14 +126,39 @@ pub fn evaluate_expression_term(
                 }),
             }
         }
+        ast::ExpressionTerm::If(If {
+            condition,
+            then_branch,
+            else_branch,
+        }) => {
+            let condition_value = evaluate_expression(condition, scope)?;
+
+            let is_truthy = match condition_value {
+                Value::Number(number) => number.is_sign_positive() && !number.is_zero(),
+                condition_value => {
+                    return Err(RuntimeError::InvalidCondition {
+                        condition_expression: *condition.clone(),
+                        condition_value,
+                    });
+                }
+            };
+
+            if is_truthy {
+                evaluate_block(then_branch, scope)
+            } else if let Some(else_branch) = else_branch {
+                evaluate_block(else_branch, scope)
+            } else {
+                Ok(Value::Void)
+            }
+        }
     }
 }
 
 pub fn evaluate_function_call(
     function_call: &ast::FunctionCall,
-    scope: &Scope,
+    scope: &mut Scope,
 ) -> Result<Value, RuntimeError> {
-    let function = scope.get_binding(&function_call.0)?;
+    let function = scope.get_binding(&function_call.0)?.clone();
 
     match function {
         Value::Function(definition, function_scope) => {
@@ -175,7 +200,7 @@ mod tests {
         let mut scope = Scope::default();
         scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
 
-        let result = evaluate_expression(&expression, &scope);
+        let result = evaluate_expression(&expression, &mut scope);
         assert_eq!(result, Ok(Value::Number(56.into())));
     }
 
@@ -187,7 +212,7 @@ mod tests {
         scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
         scope.insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
 
-        let result = evaluate_expression(&expression, &scope);
+        let result = evaluate_expression(&expression, &mut scope);
         assert_eq!(result, Ok(Value::Number(97.into())));
     }
 }

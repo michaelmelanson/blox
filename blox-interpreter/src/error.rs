@@ -13,6 +13,10 @@ pub enum RuntimeError {
         rhs_expression: ast::Expression,
         rhs_value: Value,
     },
+    InvalidCondition {
+        condition_expression: ast::Expression,
+        condition_value: Value,
+    },
     InvalidArrayIndex {
         array_expression: ast::ExpressionTerm,
         array_value: Value,
@@ -67,6 +71,15 @@ impl std::fmt::Display for RuntimeError {
                 write!(
                     f,
                     "invalid operands: {operator} cannot be used for {lhs_expression} (={lhs_value}) and {rhs_expression} (={rhs_value})"
+                )
+            }
+            RuntimeError::InvalidCondition {
+                condition_expression,
+                condition_value,
+            } => {
+                write!(
+                    f,
+                    "invalid condition: {condition_expression} (={condition_value})"
                 )
             }
             RuntimeError::NotAFunction { identifier, value } => {

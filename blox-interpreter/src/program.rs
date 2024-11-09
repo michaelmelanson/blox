@@ -310,4 +310,46 @@ mod tests {
             Value::Number(55.into()),
         );
     }
+
+    #[test]
+    fn test_if() {
+        assert_result(
+            "
+            if 0 { 'then' } else { 'else' }
+            ",
+            Value::String("else".to_string()),
+        );
+        assert_result(
+            "
+            if 0 { 'then' }
+            ",
+            Value::Void,
+        );
+        assert_result(
+            "
+            if 1 { 'then' } else { 'else' }
+            ",
+            Value::String("then".to_string()),
+        );
+        assert_result(
+            "
+            if -1 { 'then' } else { 'else' }
+            ",
+            Value::String("else".to_string()),
+        );
+        assert_result(
+            "
+            let x = 0
+            if x { 'then' } else { 'else' }
+            ",
+            Value::String("else".to_string()),
+        );
+        assert_result(
+            "
+            let x = 1
+            if x { 'then' } else { 'else' }
+            ",
+            Value::String("then".to_string()),
+        );
+    }
 }

@@ -17,9 +17,11 @@ import = { "import" ~ "{" ~ imported_symbol ~ ("," ~ imported_symbol)* ~ "}" ~ "
 imported_symbol = { identifier ~ ("as" ~ identifier)? }
 
 expression = { expression_term ~ (operator ~ expression_term)* }
-expression_term = { (array_index | object_index | function_call | value | "("~expression~")") }
+expression_term = { (if_expression | array_index | object_index | function_call | value | "("~expression~")") }
 
 value = _{ identifier | array | object | literal }
+
+if_expression = { "if" ~ expression ~ "{" ~ block ~ "}" ~ ("else" ~ "{" ~ block ~ "}")? }
 
 function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
 argument_list = _{ argument ~ ("," ~ argument)* }

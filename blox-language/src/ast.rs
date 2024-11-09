@@ -137,6 +137,7 @@ pub enum ExpressionTerm {
     Object(Object),
     ObjectIndex(ObjectIndex),
     Expression(Box<Expression>),
+    If(If),
 }
 
 impl std::fmt::Display for ExpressionTerm {
@@ -150,6 +151,7 @@ impl std::fmt::Display for ExpressionTerm {
             ExpressionTerm::ArrayIndex(v) => write!(f, "{v}"),
             ExpressionTerm::Object(v) => write!(f, "{v}"),
             ExpressionTerm::ObjectIndex(v) => write!(f, "{v}"),
+            ExpressionTerm::If(v) => write!(f, "{v}"),
         }
     }
 }
@@ -271,5 +273,26 @@ impl std::fmt::Display for FunctionCall {
             }
         }
         write!(f, ")")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct If {
+    pub condition: Box<Expression>,
+    pub then_branch: Box<Block>,
+    pub else_branch: Option<Box<Block>>,
+}
+
+impl std::fmt::Display for If {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(else_branch) = &self.else_branch {
+            write!(
+                f,
+                "if {} then {} else {}",
+                self.condition, self.then_branch, else_branch
+            )
+        } else {
+            write!(f, "if {} then {}", self.condition, self.then_branch)
+        }
     }
 }

@@ -262,6 +262,7 @@ fn parse_expression_term(
         Rule::object_index => Ok(ast::ExpressionTerm::ObjectIndex(parse_object_index(
             inner_pair,
         )?)),
+        Rule::if_expression => Ok(ast::ExpressionTerm::If(parse_if_expression(inner_pair)?)),
         rule => unimplemented!("term expression rule: {rule:?}"),
     }
 }
@@ -432,6 +433,33 @@ fn parse_object_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ObjectIn
     Ok(ast::ObjectIndex {
         object: Box::new(object.expect("expected object name")),
         key: key.expect("expected object key"),
+    })
+}
+
+fn parse_if_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::If, ParseError> {
+    let mut condition = None;
+    let mut then_branch = None;
+    let mut else_branch = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::expression => {
+                condition = Some(parse_expression(inner_pair)?);
+            }
+            Rule::block if then_branch == None => {
+                then_branch = Some(parse_block(inner_pair)?);
+            }
+            Rule::block => {
+                else_branch = Some(parse_block(inner_pair)?);
+            }
+            rule => unreachable!("if expression rule: {rule:?}"),
+        }
+    }
+
+    Ok(ast::If {
+        condition: Box::new(condition.expect("expected condition")),
+        then_branch: Box::new(then_branch.expect("expected then block")),
+        else_branch: else_branch.map(Box::new),
     })
 }
 
