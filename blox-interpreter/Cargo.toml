@@ -10,6 +10,11 @@ edition = "2021"
 blox-language = { path = "../blox-language" }
 tracing = "0.1"
 anyhow = "1.0"
-clap = { version = "4.5.20", features = ["derive"] }
-rustyline = "14.0.0"
-rust_decimal = { version = "1.36", no_default_features = true }
+clap = { version = "4.5.20", default-features = false, features = [
+    "std",
+    "derive",
+] }
+rustyline = { version = "14", default-features = false, features = [
+    "with-file-history",
+] }
+rust_decimal = { version = "1.36", default-features = false }

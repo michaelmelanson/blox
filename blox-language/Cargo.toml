@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 blox-assets = { path = "../blox-assets" }
-lazy_static = "1.5.0"
+lazy_static = "1.5"
 pest = "2.7"
 pest_derive = { version = "2.7", features = ["grammar-extras"] }
-rust_decimal = { version = "1.36", no_default_features = true }
+rust_decimal = { version = "1.36", default-features = false }

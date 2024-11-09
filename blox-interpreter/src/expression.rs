@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use blox_language::ast::{self, ArrayIndex, Object, ObjectIndex};
-use rust_decimal::Decimal;
 
 use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
