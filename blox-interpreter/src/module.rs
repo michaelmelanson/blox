@@ -2,34 +2,23 @@ use std::collections::BTreeMap;
 
 use blox_language::ast;
 
-use crate::{RuntimeError, Scope, Value};
+use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
 pub fn load_module(path: &str) -> Result<Module, RuntimeError> {
     let filename = format!("{}.blox", path);
     let source = std::fs::read_to_string(&filename)
         .map_err(|_| RuntimeError::ModuleNotFound(filename.clone()))?;
     let ast = blox_language::parse(&source)?;
-    let module = evalute_module(&path, ast);
+    let module = evalute_module(&path, ast)?;
     Ok(module)
 }
 
-pub fn evalute_module(path: &str, ast: ast::Program) -> Module {
+pub fn evalute_module(path: &str, ast: ast::Program) -> Result<Module, RuntimeError> {
     let mut scope = Scope::default();
+    evaluate_block(&ast.0, &mut scope)?;
 
-    let block = ast.0;
-
-    for statement in block.0 {
-        match statement {
-            ast::Statement::Definition(definition) => {
-                let closure = scope.clone();
-                let function = Value::Function(definition.clone(), closure);
-                scope.insert_binding(&definition.name, function);
-            }
-            _ => unimplemented!(),
-        }
-    }
-
-    Module::new(path.to_string(), scope.bindings)
+    let module = Module::new(path.to_string(), scope.bindings);
+    Ok(module)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

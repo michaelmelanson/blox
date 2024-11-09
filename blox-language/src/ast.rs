@@ -1,3 +1,5 @@
+use rust_decimal::Decimal;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(pub Block);
 
@@ -197,7 +199,7 @@ impl std::fmt::Display for ObjectIndex {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
-    Number(i64),
+    Number(Decimal),
     String(String),
     Symbol(String),
 }

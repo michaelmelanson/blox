@@ -2,7 +2,7 @@ use blox_language::{ast, ParseError};
 
 use crate::{module::Module, Value};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum RuntimeError {
     ParseError(ParseError),
     UndefinedVariable(String),
@@ -41,6 +41,7 @@ pub enum RuntimeError {
     },
     ModuleNotFound(String),
     ExportNotFound(Module, ast::Identifier),
+    DecimalConversionError(rust_decimal::Error),
 }
 
 impl std::error::Error for RuntimeError {}
@@ -113,6 +114,9 @@ impl std::fmt::Display for RuntimeError {
             RuntimeError::ExportNotFound(module, identifier) => {
                 write!(f, "export not found in {}: {identifier}", module.path)
             }
+            RuntimeError::DecimalConversionError(error) => {
+                write!(f, "decimal conversion error: {error}")
+            }
         }
     }
 }
@@ -120,5 +124,11 @@ impl std::fmt::Display for RuntimeError {
 impl From<ParseError> for RuntimeError {
     fn from(error: ParseError) -> Self {
         RuntimeError::ParseError(error)
+    }
+}
+
+impl From<rust_decimal::Error> for RuntimeError {
+    fn from(error: rust_decimal::Error) -> Self {
+        RuntimeError::DecimalConversionError(error)
     }
 }

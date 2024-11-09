@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use std::collections::BTreeMap;
 
 use blox_language::ast;
@@ -7,7 +8,7 @@ use crate::{module::Module, Scope};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     Void,
-    Number(i64),
+    Number(Decimal),
     String(String),
     Symbol(String),
     Array(Vec<Value>),

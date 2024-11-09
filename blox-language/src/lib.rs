@@ -5,22 +5,35 @@ use parser::{BloxParser, Rule};
 use pest::{pratt_parser::PrattParser, Parser};
 
 use lazy_static::lazy_static;
+use rust_decimal::Decimal;
 
 pub mod ast;
 pub mod parser;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParseError(pest::error::Error<Rule>);
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
+    PestError(pest::error::Error<Rule>),
+    DecimalError(rust_decimal::Error),
+}
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        match self {
+            ParseError::PestError(err) => write!(f, "{}", err),
+            ParseError::DecimalError(err) => write!(f, "{}", err),
+        }
     }
 }
 
 impl From<pest::error::Error<Rule>> for ParseError {
     fn from(err: pest::error::Error<Rule>) -> Self {
-        ParseError(err)
+        ParseError::PestError(err)
+    }
+}
+
+impl From<rust_decimal::Error> for ParseError {
+    fn from(err: rust_decimal::Error) -> Self {
+        ParseError::DecimalError(err)
     }
 }
 
@@ -261,7 +274,7 @@ fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<ast::Literal, Pars
     let inner_pair = pair.into_inner().next().expect("expected inner pair");
     match inner_pair.as_rule() {
         Rule::number => {
-            let number = inner_pair.as_str().parse().expect("expected number");
+            let number = Decimal::from_str_radix(inner_pair.as_str(), 10)?;
             Ok(ast::Literal::Number(number))
         }
         Rule::string => {
@@ -455,7 +468,9 @@ mod tests {
         assert_eq!(
             ast::Program(ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
-                ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(55)))
+                ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(
+                    55.into()
+                )))
             )])),
             actual
         );
@@ -469,11 +484,11 @@ mod tests {
                 ast::Identifier("test".to_string()),
                 ast::Expression::Operator(
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                        ast::Literal::Number(55)
+                        ast::Literal::Number(55.into())
                     ))),
                     ast::Operator::Add,
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                        ast::Literal::Number(42)
+                        ast::Literal::Number(42.into())
                     )))
                 )
             )])),
@@ -491,17 +506,17 @@ mod tests {
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Expression(
                         Box::new(ast::Expression::Operator(
                             Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                                ast::Literal::Number(1)
+                                ast::Literal::Number(1.into())
                             ))),
                             ast::Operator::Multiply,
                             Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                                ast::Literal::Number(2)
+                                ast::Literal::Number(2.into())
                             )))
                         ))
                     ))),
                     ast::Operator::Add,
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                        ast::Literal::Number(3)
+                        ast::Literal::Number(3.into())
                     )))
                 )
             )])),

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use blox_language::ast::{self, ArrayIndex, Object, ObjectIndex};
+use rust_decimal::Decimal;
 
 use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 
@@ -68,7 +69,15 @@ pub fn evaluate_expression_term(
 
             match (&array_value, &index_value) {
                 (Value::Array(ref members), Value::Number(idx)) => {
-                    let idx = *idx as usize;
+                    let Ok(idx): rust_decimal::Result<usize> = (*idx).try_into() else {
+                        return Err(RuntimeError::InvalidArrayIndex {
+                            array_expression: *array.clone(),
+                            array_value: array_value.clone(),
+                            index_expression: *index.clone(),
+                            index_value: index_value.clone(),
+                        });
+                    };
+
                     if idx < members.len() {
                         Ok(members[idx].clone())
                     } else {
@@ -165,10 +174,10 @@ mod tests {
         let expression = parse_expression("x + 1".to_string()).expect("parse error");
 
         let mut scope = Scope::default();
-        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55));
+        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
 
         let result = evaluate_expression(&expression, &scope);
-        assert_eq!(result, Ok(Value::Number(56)));
+        assert_eq!(result, Ok(Value::Number(56.into())));
     }
 
     #[test]
@@ -176,10 +185,10 @@ mod tests {
         let expression = parse_expression("x + y".to_string()).expect("parse error");
 
         let mut scope = Scope::default();
-        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55));
-        scope.insert_binding(&Identifier("y".to_string()), Value::Number(42));
+        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
+        scope.insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
 
         let result = evaluate_expression(&expression, &scope);
-        assert_eq!(result, Ok(Value::Number(97)));
+        assert_eq!(result, Ok(Value::Number(97.into())));
     }
 }

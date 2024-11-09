@@ -47,25 +47,25 @@ mod tests {
             "
             1 + 2 + 3
             ",
-            Value::Number(6),
+            Value::Number(6.into()),
         );
         assert_result(
             "
             1 + 2 * 3
             ",
-            Value::Number(7),
+            Value::Number(7.into()),
         );
         assert_result(
             "
             (1 + 2) * 3
             ",
-            Value::Number(9),
+            Value::Number(9.into()),
         );
         assert_result(
             "
             1 + 2 * 3 + 4
             ",
-            Value::Number(11),
+            Value::Number(11.into()),
         );
     }
 
@@ -75,28 +75,28 @@ mod tests {
             "
             let x = 42
             ",
-            Value::Number(42),
+            Value::Number(42.into()),
         );
         assert_result(
             "
             let x = 42
             x + 55
             ",
-            Value::Number(97),
+            Value::Number(97.into()),
         );
         assert_result(
             "
             let x = 42
             let y = 55
             x + y",
-            Value::Number(97),
+            Value::Number(97.into()),
         );
         assert_result(
             "
             let x = 50 + 5
             x
             ",
-            Value::Number(55),
+            Value::Number(55.into()),
         );
         assert_result(
             "
@@ -105,7 +105,7 @@ mod tests {
             let z = 123
             x + y + z
             ",
-            Value::Number(178),
+            Value::Number(178.into()),
         )
     }
 
@@ -144,40 +144,48 @@ mod tests {
             "
             let x = [1, 2, 3]
             ",
-            Value::Array(vec![Value::Number(1), Value::Number(2), Value::Number(3)]),
+            Value::Array(vec![
+                Value::Number(1.into()),
+                Value::Number(2.into()),
+                Value::Number(3.into()),
+            ]),
         );
         assert_result(
             "
             let x = [1 + 1, 2 + 2, 3 + 3]
             ",
-            Value::Array(vec![Value::Number(2), Value::Number(4), Value::Number(6)]),
+            Value::Array(vec![
+                Value::Number(2.into()),
+                Value::Number(4.into()),
+                Value::Number(6.into()),
+            ]),
         );
         assert_result(
             "
             let x = [1, 2, 3]
             x[1]
             ",
-            Value::Number(2),
+            Value::Number(2.into()),
         );
         assert_result(
             "
             let x = [1, 2, 3]
             x[0] + x[2]
             ",
-            Value::Number(4),
+            Value::Number(4.into()),
         );
         assert_result(
             "
             def numbers() { [1, 2, 3] }
             numbers()[2]
             ",
-            Value::Number(3),
+            Value::Number(3.into()),
         );
         assert_result(
             "
             [4, 5, 6][1]
             ",
-            Value::Number(5),
+            Value::Number(5.into()),
         );
     }
 
@@ -189,8 +197,8 @@ mod tests {
             ",
             Value::Object(
                 [
-                    ("a".to_string(), Value::Number(1)),
-                    ("b".to_string(), Value::Number(2)),
+                    ("a".to_string(), Value::Number(1.into())),
+                    ("b".to_string(), Value::Number(2.into())),
                 ]
                 .into(),
             ),
@@ -200,70 +208,70 @@ mod tests {
             let x = { a: 1, b: 2 }
             x.a
             ",
-            Value::Number(1),
+            Value::Number(1.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.b
             ",
-            Value::Number(2),
+            Value::Number(2.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b
             ",
-            Value::Number(3),
+            Value::Number(3.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + 3
             ",
-            Value::Number(4),
+            Value::Number(4.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + 3
             ",
-            Value::Number(6),
+            Value::Number(6.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + x.a
             ",
-            Value::Number(4),
+            Value::Number(4.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + x.b
             ",
-            Value::Number(5),
+            Value::Number(5.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + x.a + x.b
             ",
-            Value::Number(6),
+            Value::Number(6.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + x.a + x.b + 3
             ",
-            Value::Number(9),
+            Value::Number(9.into()),
         );
         assert_result(
             "
             let x = { a: 1, b: 2 }
             x.a + x.b + x.a + x.b + x.a
             ",
-            Value::Number(7),
+            Value::Number(7.into()),
         );
     }
 
@@ -274,7 +282,7 @@ mod tests {
             def add(x, y) { x + y }
             add(x: 40, y: 2)
             ",
-            Value::Number(42),
+            Value::Number(42.into()),
         );
         assert_result(
             "
@@ -283,7 +291,7 @@ mod tests {
             let y = 2
             add(x: x, y: y)
             ",
-            Value::Number(42),
+            Value::Number(42.into()),
         );
         assert_result(
             "
@@ -291,7 +299,7 @@ mod tests {
             let x = 40
             add(x: x, y: 2)
             ",
-            Value::Number(42),
+            Value::Number(42.into()),
         );
         assert_result(
             "
@@ -299,7 +307,7 @@ mod tests {
             def add_to(x) { x + delta }
             add_to(x: 50)
             ",
-            Value::Number(55),
+            Value::Number(55.into()),
         );
     }
 }
