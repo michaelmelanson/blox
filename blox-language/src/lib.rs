@@ -1,6 +1,6 @@
 use std::result::Result;
 
-use ast::{Expression, Operator};
+use ast::{Block, Expression, Operator};
 use parser::{BloxParser, Rule};
 use pest::{pratt_parser::PrattParser, Parser};
 
@@ -456,6 +456,7 @@ fn parse_object_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ObjectIn
 fn parse_if_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::If, ParseError> {
     let mut condition = None;
     let mut then_branch = None;
+    let mut elseif_branches = vec![];
     let mut else_branch = None;
 
     for inner_pair in pair.into_inner() {
@@ -466,8 +467,11 @@ fn parse_if_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::If, Par
             Rule::block if then_branch == None => {
                 then_branch = Some(parse_block(inner_pair)?);
             }
-            Rule::block => {
-                else_branch = Some(parse_block(inner_pair)?);
+            Rule::elseif_expression => {
+                elseif_branches.push(parse_elseif_expression(inner_pair)?);
+            }
+            Rule::else_expression => {
+                else_branch = Some(parse_else_expression(inner_pair)?);
             }
             rule => unreachable!("if expression rule: {rule:?}"),
         }
@@ -475,9 +479,49 @@ fn parse_if_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::If, Par
 
     Ok(ast::If {
         condition: Box::new(condition.expect("expected condition")),
-        then_branch: Box::new(then_branch.expect("expected then block")),
-        else_branch: else_branch.map(Box::new),
+        then_branch: then_branch.expect("expected then block"),
+        elseif_branches,
+        else_branch,
     })
+}
+
+fn parse_elseif_expression(
+    pair: pest::iterators::Pair<Rule>,
+) -> Result<(Expression, Block), ParseError> {
+    let mut condition = None;
+    let mut block = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::expression => {
+                condition = Some(parse_expression(inner_pair)?);
+            }
+            Rule::block => {
+                block = Some(parse_block(inner_pair)?);
+            }
+            rule => unreachable!("elseif expression rule: {rule:?}"),
+        }
+    }
+
+    Ok((
+        condition.expect("expected condition"),
+        block.expect("expected block"),
+    ))
+}
+
+fn parse_else_expression(pair: pest::iterators::Pair<Rule>) -> Result<Block, ParseError> {
+    let mut block = None;
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::block => {
+                block = Some(parse_block(inner_pair)?);
+            }
+            rule => unreachable!("else expression rule: {rule:?}"),
+        }
+    }
+
+    Ok(block.expect("expected block"))
 }
 
 fn parse_argument(pair: pest::iterators::Pair<Rule>) -> Result<ast::Argument, ParseError> {

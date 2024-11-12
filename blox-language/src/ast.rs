@@ -295,20 +295,23 @@ impl std::fmt::Display for FunctionCall {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct If {
     pub condition: Box<Expression>,
-    pub then_branch: Box<Block>,
-    pub else_branch: Option<Box<Block>>,
+    pub then_branch: Block,
+    pub elseif_branches: Vec<(Expression, Block)>,
+    pub else_branch: Option<Block>,
 }
 
 impl std::fmt::Display for If {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(else_branch) = &self.else_branch {
-            write!(
-                f,
-                "if {} then {} else {}",
-                self.condition, self.then_branch, else_branch
-            )
-        } else {
-            write!(f, "if {} then {}", self.condition, self.then_branch)
+        write!(f, "if {} {{ {} }}", self.condition, self.then_branch)?;
+
+        for (condition, branch) in &self.elseif_branches {
+            write!(f, "else if {} {{ {} }}", condition, branch)?;
         }
+
+        if let Some(branch) = &self.else_branch {
+            write!(f, "else {{ {} }}", branch)?;
+        }
+
+        Ok(())
     }
 }

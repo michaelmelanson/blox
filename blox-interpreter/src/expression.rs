@@ -181,30 +181,46 @@ pub fn evaluate_expression_term(
         ast::ExpressionTerm::If(If {
             condition,
             then_branch,
+            elseif_branches,
             else_branch,
         }) => {
-            let condition_value = evaluate_expression(condition, scope)?;
-
-            let is_truthy = match condition_value {
-                Value::Boolean(value) => value,
-                Value::Number(number) => number.is_sign_positive() && !number.is_zero(),
-                condition_value => {
-                    return Err(RuntimeError::InvalidCondition {
-                        condition_expression: *condition.clone(),
-                        condition_value,
-                    });
-                }
-            };
-
-            if is_truthy {
-                evaluate_block(then_branch, scope)
-            } else if let Some(else_branch) = else_branch {
-                evaluate_block(else_branch, scope)
-            } else {
-                Ok(Value::Void)
+            if evaluate_condition(condition, scope)? {
+                return evaluate_block(then_branch, scope);
             }
+
+            for elseif_branch in elseif_branches {
+                if evaluate_condition(&elseif_branch.0, scope)? {
+                    return evaluate_block(&elseif_branch.1, scope);
+                }
+            }
+
+            if let Some(else_branch) = else_branch {
+                return evaluate_block(else_branch, scope);
+            }
+
+            Ok(Value::Void)
         }
     }
+}
+
+fn evaluate_condition(
+    expression: &ast::Expression,
+    scope: &mut Arc<Scope>,
+) -> Result<bool, RuntimeError> {
+    let condition_value = evaluate_expression(expression, scope)?;
+
+    let is_truthy = match condition_value {
+        Value::Boolean(value) => value,
+        Value::Number(number) => number.is_sign_positive() && !number.is_zero(),
+        condition_value => {
+            return Err(RuntimeError::InvalidCondition {
+                condition_expression: expression.clone(),
+                condition_value,
+            });
+        }
+    };
+
+    Ok(is_truthy)
 }
 
 pub fn evaluate_function_call(

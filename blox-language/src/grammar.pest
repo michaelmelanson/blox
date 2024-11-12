@@ -24,7 +24,9 @@ expression_term = { (if_expression | array_index | object_index | function_call 
 
 value = _{ literal | identifier | array | object }
 
-if_expression = { "if" ~ expression ~ "{" ~ block ~ "}" ~ ("else" ~ "{" ~ block ~ "}")? }
+if_expression = { "if" ~ expression ~ "{" ~ block ~ "}" ~ elseif_expression* ~ else_expression? }
+elseif_expression = { "else" ~ "if" ~ expression ~ "{" ~ block ~ "}" }
+else_expression = { "else" ~ "{" ~ block ~ "}" }
 
 function_call = { identifier ~ "(" ~ argument_list? ~ ")" }
 argument_list = _{ argument ~ ("," ~ argument)* }

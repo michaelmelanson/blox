@@ -392,12 +392,10 @@ mod tests {
             def fib(x) {
               if x == 0 {
                 0
+              } else if x == 1 {
+                1
               } else {
-                if x == 1 {
-                  1
-                } else {
-                  fib(x: x - 2) + fib(x: x - 1)
-                }
+                fib(x: x - 2) + fib(x: x - 1)
               }
             }
             fib(x: 10)
