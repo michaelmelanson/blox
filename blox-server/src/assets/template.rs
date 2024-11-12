@@ -17,7 +17,7 @@ impl Template {
                 handlebars.register_template("template", template.clone());
 
                 let mut data = HashMap::new();
-                for (identifier, value) in &scope.bindings {
+                for (identifier, value) in scope.bindings.read().unwrap().iter() {
                     data.insert(identifier.0.clone(), value.to_string());
                 }
 

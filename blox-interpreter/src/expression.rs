@@ -1,12 +1,12 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use blox_language::ast::{self, ArrayIndex, If, Object, ObjectIndex};
 
-use crate::{program::evaluate_block, RuntimeError, Scope, Value};
+use crate::{program::evaluate_block, value::Function, RuntimeError, Scope, Value};
 
 pub fn evaluate_expression(
     expression: &ast::Expression,
-    scope: &mut Scope,
+    scope: &mut Arc<Scope>,
 ) -> Result<Value, RuntimeError> {
     match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, scope),
@@ -18,12 +18,63 @@ pub fn evaluate_expression(
                 (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
                     Ok(Value::Number(lhs + rhs))
                 }
+                (Value::Number(lhs), ast::Operator::Subtract, Value::Number(rhs)) => {
+                    Ok(Value::Number(lhs - rhs))
+                }
                 (Value::Number(lhs), ast::Operator::Multiply, Value::Number(rhs)) => {
                     Ok(Value::Number(lhs * rhs))
                 }
                 (Value::String(lhs), ast::Operator::Concatenate, Value::String(rhs)) => {
                     Ok(Value::String(format!("{lhs}{rhs}")))
                 }
+
+                (Value::Boolean(lhs), ast::Operator::Equal, Value::Boolean(rhs)) => {
+                    Ok(Value::Boolean(lhs == rhs))
+                }
+                (Value::Number(lhs), ast::Operator::Equal, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs == rhs))
+                }
+                (Value::String(lhs), ast::Operator::Equal, Value::String(rhs)) => {
+                    Ok(Value::Boolean(lhs == rhs))
+                }
+                (Value::Symbol(lhs), ast::Operator::Equal, Value::Symbol(rhs)) => {
+                    Ok(Value::Boolean(lhs == rhs))
+                }
+                (_, ast::Operator::Equal, _) => Ok(Value::Boolean(false)),
+
+                (Value::Boolean(lhs), ast::Operator::NotEqual, Value::Boolean(rhs)) => {
+                    Ok(Value::Boolean(lhs != rhs))
+                }
+                (Value::Number(lhs), ast::Operator::NotEqual, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs != rhs))
+                }
+                (Value::String(lhs), ast::Operator::NotEqual, Value::String(rhs)) => {
+                    Ok(Value::Boolean(lhs != rhs))
+                }
+                (Value::Symbol(lhs), ast::Operator::NotEqual, Value::Symbol(rhs)) => {
+                    Ok(Value::Boolean(lhs != rhs))
+                }
+                (_, ast::Operator::NotEqual, _) => Ok(Value::Boolean(false)),
+
+                (Value::Number(lhs), ast::Operator::GreaterOrEqual, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs >= rhs))
+                }
+                (_, ast::Operator::GreaterOrEqual, _) => Ok(Value::Boolean(false)),
+
+                (Value::Number(lhs), ast::Operator::GreaterThan, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs > rhs))
+                }
+                (_, ast::Operator::GreaterThan, _) => Ok(Value::Boolean(false)),
+
+                (Value::Number(lhs), ast::Operator::LessOrEqual, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs <= rhs))
+                }
+                (_, ast::Operator::LessOrEqual, _) => Ok(Value::Boolean(false)),
+
+                (Value::Number(lhs), ast::Operator::LessThan, Value::Number(rhs)) => {
+                    Ok(Value::Boolean(lhs < rhs))
+                }
+                (_, ast::Operator::LessThan, _) => Ok(Value::Boolean(false)),
 
                 (lhs_value, operator, rhs_value) => Err(RuntimeError::InvalidOperands {
                     lhs_expression: *lhs.clone(),
@@ -39,10 +90,10 @@ pub fn evaluate_expression(
 
 pub fn evaluate_expression_term(
     term: &ast::ExpressionTerm,
-    scope: &mut Scope,
+    scope: &mut Arc<Scope>,
 ) -> Result<Value, RuntimeError> {
     match term {
-        ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier).cloned(),
+        ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier),
         ast::ExpressionTerm::Literal(ast::Literal::Boolean(value)) => Ok(Value::Boolean(*value)),
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Ok(Value::Number(*number)),
         ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
@@ -135,6 +186,7 @@ pub fn evaluate_expression_term(
             let condition_value = evaluate_expression(condition, scope)?;
 
             let is_truthy = match condition_value {
+                Value::Boolean(value) => value,
                 Value::Number(number) => number.is_sign_positive() && !number.is_zero(),
                 condition_value => {
                     return Err(RuntimeError::InvalidCondition {
@@ -157,13 +209,16 @@ pub fn evaluate_expression_term(
 
 pub fn evaluate_function_call(
     function_call: &ast::FunctionCall,
-    scope: &mut Scope,
+    scope: &mut Arc<Scope>,
 ) -> Result<Value, RuntimeError> {
     let function = scope.get_binding(&function_call.0)?.clone();
 
     match function {
-        Value::Function(definition, function_scope) => {
-            let mut call_scope = function_scope.clone();
+        Value::Function(Function {
+            definition,
+            closure,
+        }) => {
+            let mut call_scope = closure.child();
 
             for (parameter, argument) in definition.parameters.iter().zip(&function_call.1) {
                 let value = evaluate_expression(&argument.1, scope)?;
@@ -181,6 +236,8 @@ pub fn evaluate_function_call(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use blox_language::{
         ast::{Expression, Identifier},
         ParseError,
@@ -198,7 +255,7 @@ mod tests {
     fn test_evaluate_addition_identifier_literal() {
         let expression = parse_expression("x + 1".to_string()).expect("parse error");
 
-        let mut scope = Scope::default();
+        let mut scope = Arc::new(Scope::default());
         scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
 
         let result = evaluate_expression(&expression, &mut scope);
@@ -209,7 +266,7 @@ mod tests {
     fn test_evaluate_addition_identifier_identifier() {
         let expression = parse_expression("x + y".to_string()).expect("parse error");
 
-        let mut scope = Scope::default();
+        let mut scope = Arc::new(Scope::default());
         scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
         scope.insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
 

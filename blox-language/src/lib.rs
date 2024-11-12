@@ -216,8 +216,16 @@ lazy_static! {
 
         // Precedence is defined lowest to highest
         PrattParser::new()
-            .op(Op::infix(add, Left) | Op::infix(concatenate, Left))
+            .op(Op::infix(add, Left)
+                | Op::infix(subtract, Left)
+                | Op::infix(concatenate, Left))
             .op(Op::infix(multiply, Left))
+            .op(Op::infix(equal, Left)
+                | Op::infix(not_equal, Left)
+                | Op::infix(less_or_equal, Left)
+                | Op::infix(less_than, Left)
+                | Op::infix(greater_or_equal, Left)
+                | Op::infix(greater_than, Left))
     };
 }
 
@@ -230,8 +238,15 @@ fn parse_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
         .map_infix(|lhs, op, rhs| {
             let op = match op.as_rule() {
                 Rule::add => Operator::Add,
+                Rule::subtract => Operator::Subtract,
                 Rule::multiply => Operator::Multiply,
                 Rule::concatenate => Operator::Concatenate,
+                Rule::equal => Operator::Equal,
+                Rule::not_equal => Operator::NotEqual,
+                Rule::greater_or_equal => Operator::GreaterOrEqual,
+                Rule::greater_than => Operator::GreaterThan,
+                Rule::less_or_equal => Operator::LessOrEqual,
+                Rule::less_than => Operator::LessThan,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Ok(Expression::Operator(Box::new(lhs?), op, Box::new(rhs?)))

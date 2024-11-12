@@ -1,10 +1,15 @@
+use std::sync::Arc;
+
 use blox_language::ast;
 
-use crate::{expression::evaluate_expression, module::load_module, RuntimeError, Scope, Value};
+use crate::{
+    expression::evaluate_expression, module::load_module, value::Function, RuntimeError, Scope,
+    Value,
+};
 
 pub fn execute_statement(
     statement: &ast::Statement,
-    scope: &mut Scope,
+    scope: &mut Arc<Scope>,
 ) -> Result<Value, RuntimeError> {
     match statement {
         ast::Statement::Expression(expression) => {
@@ -17,9 +22,15 @@ pub fn execute_statement(
             Ok(value)
         }
         ast::Statement::Definition(definition) => {
-            let closure = scope.clone();
-            let function = Value::Function(definition.clone(), closure);
+            let closure = scope.child();
+
+            let function = Value::Function(Function {
+                definition: definition.clone(),
+                closure: closure.clone(),
+            });
+
             scope.insert_binding(&definition.name, function.clone());
+
             Ok(function)
         }
         ast::Statement::Import(import) => {

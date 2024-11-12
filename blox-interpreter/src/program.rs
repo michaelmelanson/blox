@@ -1,12 +1,17 @@
+use std::sync::Arc;
+
 use blox_language::ast;
 
 use crate::{statement::execute_statement, RuntimeError, Scope, Value};
 
-pub fn execute_program(program: &ast::Program, scope: &mut Scope) -> Result<Value, RuntimeError> {
+pub fn execute_program(
+    program: &ast::Program,
+    scope: &mut Arc<Scope>,
+) -> Result<Value, RuntimeError> {
     evaluate_block(&program.0, scope)
 }
 
-pub fn evaluate_block(block: &ast::Block, scope: &mut Scope) -> Result<Value, RuntimeError> {
+pub fn evaluate_block(block: &ast::Block, scope: &mut Arc<Scope>) -> Result<Value, RuntimeError> {
     let mut value = Value::Void;
 
     for statement in &block.0 {
@@ -28,7 +33,7 @@ mod tests {
             Err(e) => panic!("Parsing error: {}", e),
         };
 
-        let mut scope = Scope::default();
+        let mut scope = Arc::new(Scope::default());
         let result = execute_program(&program, &mut scope);
 
         match &result {
@@ -356,6 +361,48 @@ mod tests {
             if x { 'then' } else { 'else' }
             ",
             Value::String("then".to_string()),
+        );
+
+        assert_result("if 1 == 1 { 'ok' }", Value::String("ok".to_string()));
+        assert_result("if 1 == 2 { 'bork' }", Value::Void);
+        assert_result("if true == 1 { 'bork' }", Value::Void);
+        assert_result("if false == 1 { 'bork' }", Value::Void);
+        assert_result("if 1 == true { 'bork' }", Value::Void);
+        assert_result("if 1 == false { 'bork' }", Value::Void);
+        assert_result("if true == true { 'ok' }", Value::String("ok".to_string()));
+        assert_result(
+            "if false == false { 'ok' }",
+            Value::String("ok".to_string()),
+        );
+        assert_result(
+            "if 'blox' == 'blox' { 'ok' }",
+            Value::String("ok".to_string()),
+        );
+        assert_result("if 'blox' == 'ruby' { 'bork' }", Value::Void);
+
+        assert_result("if 1 < 2 { 'ok' }", Value::String("ok".to_string()));
+        assert_result("if 2 < 2 { 'error' }", Value::Void);
+        assert_result("if 2 < 2 { 'error' }", Value::Void);
+    }
+
+    #[test]
+    pub fn test_fib() {
+        assert_result(
+            "
+            def fib(x) {
+              if x == 0 {
+                0
+              } else {
+                if x == 1 {
+                  1
+                } else {
+                  fib(x: x - 2) + fib(x: x - 1)
+                }
+              }
+            }
+            fib(x: 10)
+            ",
+            Value::Number(55.into()),
         );
     }
 }

@@ -103,7 +103,7 @@ pub async fn handle_request(
 
     let mut assets = assets.lock().unwrap();
 
-    let mut scope = Scope::default();
+    let mut scope = Arc::new(Scope::default());
     for (name, value) in bindings {
         scope.insert_binding(&Identifier(name.clone()), Value::String(value))
     }

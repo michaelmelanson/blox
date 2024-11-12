@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use blox_language::ast;
 
@@ -14,14 +14,14 @@ pub fn load_module(path: &str) -> Result<Module, RuntimeError> {
 }
 
 pub fn evalute_module(path: &str, ast: ast::Program) -> Result<Module, RuntimeError> {
-    let mut scope = Scope::default();
+    let mut scope = Arc::new(Scope::default());
     evaluate_block(&ast.0, &mut scope)?;
 
-    let module = Module::new(path.to_string(), scope.bindings);
+    let module = Module::new(path.to_string(), scope.bindings.read().unwrap().clone());
     Ok(module)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub path: String,
     pub exports: BTreeMap<ast::Identifier, Value>,

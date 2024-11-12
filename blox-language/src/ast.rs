@@ -237,16 +237,30 @@ impl std::fmt::Display for Array {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operator {
     Add,
+    Subtract,
     Multiply,
     Concatenate,
+    Equal,
+    NotEqual,
+    GreaterOrEqual,
+    GreaterThan,
+    LessOrEqual,
+    LessThan,
 }
 
 impl std::fmt::Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Operator::Add => write!(f, "+"),
+            Operator::Subtract => write!(f, "-"),
             Operator::Multiply => write!(f, "+"),
             Operator::Concatenate => write!(f, "++"),
+            Operator::Equal => write!(f, "=="),
+            Operator::NotEqual => write!(f, "!="),
+            Operator::GreaterOrEqual => write!(f, ">="),
+            Operator::GreaterThan => write!(f, ">"),
+            Operator::LessOrEqual => write!(f, "<="),
+            Operator::LessThan => write!(f, "<"),
         }
     }
 }

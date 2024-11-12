@@ -41,7 +41,14 @@ object_members = _{ object_member ~ ("," ~ object_member)* }
 object_member = { identifier ~ ":" ~ expression }
 object_index = { (function_call | identifier | object) ~ "." ~ identifier }
 
-operator = _{ multiply | concatenate | add }
+operator = _{ multiply | concatenate | add | subtract | equal | not_equal | greater_or_equal | greater_than | less_or_equal | less_than }
+multiply = { "*" }
 concatenate = { "++" }
 add = { "+" }
-multiply = { "*" }
+subtract = { "-" }
+equal = { "==" }
+not_equal = { "!=" }
+greater_or_equal = { ">=" }
+greater_than = { ">" }
+less_or_equal = { "<=" }
+less_than = { "<" }

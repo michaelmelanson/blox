@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use blox_interpreter::Scope;
 use blox_language::parse;
 use clap::Parser;
@@ -18,7 +20,7 @@ pub fn main() -> rustyline::Result<()> {
         let mut editor = rustyline::DefaultEditor::new()?;
         editor.load_history(".blox-history")?;
 
-        let mut scope = Scope::default();
+        let mut scope = Arc::new(Scope::default());
 
         'repl: loop {
             let line = editor.readline("blox> ");
