@@ -3,7 +3,7 @@ use std::{
     fs::DirEntry,
     path::{Component, Components, PathBuf},
     sync::{
-        mpsc::{self, SendError},
+        mpsc::{self},
         Arc,
     },
 };
