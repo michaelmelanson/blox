@@ -1,1 +1,13 @@
-
+let Item = model(
+    name: 'item',
+    properties: {
+        name: {
+            type: :string,
+            required: true
+        },
+        completed: {
+            type: :boolean,
+            default: false
+        }
+    }
+);

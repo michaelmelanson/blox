@@ -3,18 +3,20 @@ use std::sync::{Arc, Mutex};
 use blox_assets::{types::AssetPath, AssetError, AssetManager};
 use blox_language::ast::Identifier;
 use clap::{command, Parser};
+use environment::BloxEnvironment;
 use std::net::SocketAddr;
 use tracing_subscriber::EnvFilter;
 
 use http_body_util::Full;
 use hyper::{body::Bytes, server::conn::http1, service::service_fn, Request, Response};
-use hyper_util::rt::TokioIo;
+use hyper_util::rt::{TokioIo, TokioTimer};
 use tokio::net::TcpListener;
 
 use router::request_asset_path;
 use tracing::{debug, error, info, instrument, metadata::LevelFilter};
 
 mod assets;
+mod environment;
 mod router;
 
 use assets::{program::BloxProgram, static_file::StaticFile, template::Template};
@@ -56,8 +58,11 @@ async fn main() {
 }
 
 async fn start(port: u16, path: String) -> Result<(), anyhow::Error> {
-    let cache = AssetManager::new(&path)?;
-    let cache = Arc::new(Mutex::new(cache));
+    let assets = AssetManager::new(&path)?;
+    let assets = Arc::new(Mutex::new(assets));
+
+    let environment = BloxEnvironment::new(assets.clone());
+    environment.start();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(addr).await?;
@@ -67,15 +72,15 @@ async fn start(port: u16, path: String) -> Result<(), anyhow::Error> {
         let (tcp, _) = listener.accept().await?;
         let io = TokioIo::new(tcp);
 
-        let cache = cache.clone();
+        let assets = assets.clone();
 
         tokio::task::spawn(async move {
             let service = service_fn(|req: Request<hyper::body::Incoming>| async {
-                handle_request(req, cache.clone()).await
+                handle_request(req, assets.clone()).await
             });
 
             if let Err(err) = http1::Builder::new()
-                // .timer(TokioTimer::new())
+                .timer(TokioTimer::new())
                 .serve_connection(io, service)
                 .await
             {
@@ -155,6 +160,9 @@ pub async fn handle_request(
             let asset = assets.load::<StaticFile>(&path)?;
             Ok(asset.into())
         }
-        AssetPath::Layout(_) => todo!("layout routes"),
+        path => {
+            error!(?path, "Unsupported asset type");
+            Ok(Response::new("Unsupported asset type".into()))
+        }
     }
 }

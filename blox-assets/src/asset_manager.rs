@@ -2,8 +2,14 @@ use std::{
     collections::{HashMap, HashSet},
     fs::DirEntry,
     path::{Component, Components, PathBuf},
+    sync::{
+        mpsc::{self, SendError},
+        Arc,
+    },
 };
 
+use notify::{Event, RecursiveMode, Watcher};
+use tokio::{spawn, sync::Notify};
 use tracing::{debug, error, info, info_span, instrument, warn};
 
 use crate::{
@@ -13,30 +19,87 @@ use crate::{
     types::{Action, AssetPath, RoutePathPart},
 };
 
-#[derive(Clone)]
 pub struct AssetManager {
     base_dir: PathBuf,
     asset_index: HashMap<AssetPath, HashSet<PathBuf>>,
+    on_change: Arc<Notify>,
+    pending_changes: mpsc::Receiver<PendingChange>,
 }
+
+struct PendingChange;
 
 impl AssetManager {
     pub fn new(base_dir: &str) -> anyhow::Result<Self> {
         let base_dir = std::fs::canonicalize(base_dir)?;
 
+        let (tx, rx) = mpsc::channel::<PendingChange>();
+
         let mut asset_manager = AssetManager {
             base_dir,
             asset_index: Default::default(),
+            on_change: Arc::new(Notify::new()),
+            pending_changes: rx,
         };
 
-        asset_manager.start()?;
+        asset_manager.reindex()?;
+        asset_manager.start(tx)?;
 
         Ok(asset_manager)
     }
 
-    pub fn start(&mut self) -> anyhow::Result<()> {
-        self.reindex()?;
+    fn start(&mut self, pending_change_sender: mpsc::Sender<PendingChange>) -> anyhow::Result<()> {
+        let base_dir = self.base_dir.clone();
+        let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+        let mut watcher = notify::recommended_watcher(tx)?;
+        watcher.watch(&base_dir, RecursiveMode::Recursive).unwrap();
 
-        debug!("after initial index: {:#?}", self.asset_index);
+        spawn(async move {
+            info!("watching for changes in {}...", base_dir.to_string_lossy());
+            for res in rx {
+                match res {
+                    Ok(event) => match event.kind {
+                        notify::EventKind::Create(_)
+                        | notify::EventKind::Modify(_)
+                        | notify::EventKind::Remove(_) => {
+                            info!("change detected: {:?}", event.paths);
+
+                            if let Err(_) = pending_change_sender.send(PendingChange) {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    },
+
+                    Err(e) => {
+                        error!("watch error: {:?}", e);
+                        break;
+                    }
+                }
+            }
+            drop(watcher);
+        });
+
+        Ok(())
+    }
+
+    pub fn on_change(&self) -> Arc<Notify> {
+        self.on_change.clone()
+    }
+
+    #[instrument(skip(self))]
+    pub fn process_pending_changes(&mut self) -> anyhow::Result<()> {
+        let mut changed = false;
+
+        while let Ok(_) = self.pending_changes.try_recv() {
+            changed = true;
+        }
+
+        if changed {
+            info!("processing changes...");
+            self.reindex()?;
+            self.on_change.notify_waiters();
+        }
+
         Ok(())
     }
 
@@ -44,6 +107,8 @@ impl AssetManager {
     pub fn load<T: Asset>(&mut self, asset_path: &AssetPath) -> anyhow::Result<T> {
         let span = info_span!("load");
         span.in_scope(|| {
+            self.process_pending_changes()?;
+
             let file_paths = self
                 .asset_index
                 .get(asset_path)
@@ -68,8 +133,6 @@ impl AssetManager {
             }
 
             if let Some((path, extension)) = matching_path {
-                debug!(path = path.to_string_lossy().to_string().as_str(), "trying");
-
                 let raw_contents = std::fs::read(path)?;
                 let asset = T::Loader::load(&raw_contents, &extension)?;
                 info!(path = path.to_string_lossy().to_string().as_str(), "loaded");
@@ -110,7 +173,7 @@ impl AssetManager {
         if let Some(Component::Normal(c)) = components.next() {
             match c.to_str() {
                 Some("app") => self.reindex_app_file(components, path),
-                _ => debug!("unrecognized top level file: {:?}", path),
+                _ => {} // debug!("unrecognized top level file: {:?}", path)},
             }
         }
     }
@@ -121,6 +184,7 @@ impl AssetManager {
         };
 
         match c.to_str() {
+            Some("models") => self.reindex_models_file(components, path),
             Some("routes") => self.reindex_routes_file(components, path),
             Some("static") => {
                 // join together remoaining components to get the path
@@ -137,6 +201,20 @@ impl AssetManager {
             }
             _ => debug!("unrecognized app file: {:?}", path),
         }
+    }
+
+    fn reindex_models_file(&mut self, mut components: Components, path: &PathBuf) {
+        let model_name = components
+            .next_back()
+            .unwrap()
+            .as_os_str()
+            .to_str()
+            .unwrap();
+        let asset_path = AssetPath::Model(model_name.to_string());
+        self.asset_index
+            .entry(asset_path)
+            .or_default()
+            .insert(path.clone());
     }
 
     fn reindex_routes_file(&mut self, mut components: Components, path: &PathBuf) {

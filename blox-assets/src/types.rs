@@ -40,6 +40,7 @@ pub enum RoutePathPart {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AssetPath {
     Route(Vec<RoutePathPart>),
+    Model(String),
     Static(String),
     Layout(String),
 }
@@ -48,6 +49,7 @@ impl Display for AssetPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AssetPath::Route(path_parts) => write!(f, "Route({:?})", path_parts),
+            AssetPath::Model(name) => write!(f, "Model({})", name),
             AssetPath::Static(name) => write!(f, "Static({})", name),
             AssetPath::Layout(name) => write!(f, "Layout({})", name),
         }
