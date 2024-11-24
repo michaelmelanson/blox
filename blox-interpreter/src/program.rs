@@ -4,6 +4,7 @@ use blox_language::ast;
 
 use crate::{statement::execute_statement, RuntimeError, Scope, Value};
 
+#[tracing::instrument(level = "debug", skip(program, scope))]
 pub fn execute_program(
     program: &ast::Program,
     scope: &mut Arc<Scope>,

@@ -7,6 +7,7 @@ use blox_language::ast::{self, Argument, ArrayIndex, If, Object, ObjectIndex};
 
 use crate::{program::evaluate_block, value::Function, Intrinsic, RuntimeError, Scope, Value};
 
+#[tracing::instrument(level = "trace", skip(scope), ret)]
 pub fn evaluate_expression(
     expression: &ast::Expression,
     scope: &mut Arc<Scope>,
