@@ -162,3 +162,50 @@ Greater than or equal
       lhs: (term (literal (number)))
       operator: (greater_or_equal)
       rhs: (term (literal (string))))))
+
+===============
+Assignment (simple)
+===============
+
+x = 1
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term (identifier))
+      operator: (assignment)
+      rhs: (term (literal (number))))))
+
+======================
+Assignment (object property)
+======================
+
+foo.bar = 55
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term (object_index
+        base: (term (identifier))
+        index: (identifier)))
+      operator: (assignment)
+      rhs: (term (literal (number))))))
+
+======================
+Append to array
+======================
+
+array << value
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term (identifier))
+      operator: (append)
+      rhs: (term (identifier)))))

@@ -23,3 +23,31 @@ Strings
 (source_file
   (expression_statement
     (term (literal (string)))))
+
+============
+Object literals
+============
+
+{ a: 1, b: 'test' }
+
+---
+
+(source_file
+  (expression_statement
+    (term (object
+      (object_member (identifier) (term (literal (number))))
+      (object_member (identifier) (term (literal (string))))))))
+
+===========================
+Object literal with trailing comma
+===========================
+
+{ a: 1, b: 'test', }
+
+---
+
+(source_file
+  (expression_statement
+    (term (object
+      (object_member (identifier) (term (literal (number))))
+      (object_member (identifier) (term (literal (string))))))))

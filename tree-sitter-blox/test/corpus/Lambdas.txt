@@ -1,0 +1,34 @@
+====================
+Lambda (no parameters)
+====================
+
+|| 1 + a
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (term
+      (lambda
+        body: (binary_expression
+          lhs: (term (literal (number)))
+          operator: (add)
+          rhs: (term (identifier)))))))
+
+====================
+Lambda (one parameter)
+====================
+
+|x| 1 + x
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (term
+      (lambda
+        parameter: (identifier)
+        body: (binary_expression
+          lhs: (term (literal (number)))
+          operator: (add)
+          rhs: (term (identifier)))))))

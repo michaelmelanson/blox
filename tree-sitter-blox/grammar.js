@@ -61,6 +61,7 @@ module.exports = grammar({
         $.array_index,
         $.object_index,
         $.function_call,
+        $.lambda,
         $._value,
         $.group_term,
       ),
@@ -72,19 +73,22 @@ module.exports = grammar({
       ),
     binary_expression: ($) => {
       let operators = [
+        { operator: $.multiply, precedence: 3 },
+        { operator: $.divide, precedence: 3 },
+        { operator: $.concatenate, precedence: 2 },
+        { operator: $.add, precedence: 2 },
+        { operator: $.subtract, precedence: 2 },
         { operator: $.multiply, precedence: 2 },
         { operator: $.divide, precedence: 2 },
-        { operator: $.concatenate, precedence: 1 },
-        { operator: $.add, precedence: 1 },
-        { operator: $.subtract, precedence: 1 },
-        { operator: $.multiply, precedence: 1 },
-        { operator: $.divide, precedence: 1 },
-        { operator: $.equal, precedence: 1 },
-        { operator: $.not_equal, precedence: 1 },
-        { operator: $.less_than, precedence: 1 },
-        { operator: $.less_or_equal, precedence: 1 },
-        { operator: $.greater_than, precedence: 1 },
-        { operator: $.greater_or_equal, precedence: 1 },
+        { operator: $.equal, precedence: 2 },
+        { operator: $.not_equal, precedence: 2 },
+        { operator: $.less_than, precedence: 2 },
+        { operator: $.less_or_equal, precedence: 2 },
+        { operator: $.greater_than, precedence: 2 },
+        { operator: $.greater_or_equal, precedence: 2 },
+
+        { operator: $.assignment, precedence: 1 },
+        { operator: $.append, precedence: 1 },
       ];
 
       return prec.right(
@@ -154,6 +158,7 @@ module.exports = grammar({
       seq(
         field("member", $.object_member),
         repeat(seq(",", field("member", $.object_member))),
+        optional(","),
       ),
     object_member: ($) =>
       seq(field("key", $.identifier), ":", field("value", $._expression)),
@@ -161,6 +166,18 @@ module.exports = grammar({
       prec(
         4,
         seq(field("base", $._expression), ".", field("index", $.identifier)),
+      ),
+    lambda: ($) => seq($._lambda_parameters, field("body", $._expression)),
+    _lambda_parameters: ($) =>
+      seq(
+        "|",
+        optional(
+          seq(
+            field("parameter", $.identifier),
+            repeat(seq(",", field("parameter", $.identifier))),
+          ),
+        ),
+        "|",
       ),
 
     unary_operator: ($) => choice($.negate, $.not),
@@ -177,6 +194,8 @@ module.exports = grammar({
     greater_than: ($) => ">",
     less_or_equal: ($) => "<=",
     less_than: ($) => "<",
+    assignment: ($) => "=",
+    append: ($) => "<<",
 
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
 

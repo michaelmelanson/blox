@@ -100,6 +100,11 @@
     }
   },
   {
+    "type": "assignment",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "binary_expression",
     "named": true,
     "fields": {
@@ -127,6 +132,14 @@
         "types": [
           {
             "type": "add",
+            "named": true
+          },
+          {
+            "type": "append",
+            "named": true
+          },
+          {
+            "type": "assignment",
             "named": true
           },
           {
@@ -544,6 +557,40 @@
     }
   },
   {
+    "type": "lambda",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "binary_expression",
+            "named": true
+          },
+          {
+            "type": "term",
+            "named": true
+          },
+          {
+            "type": "unary_expression",
+            "named": true
+          }
+        ]
+      },
+      "parameter": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "literal",
     "named": true,
     "fields": {},
@@ -736,6 +783,10 @@
           "named": true
         },
         {
+          "type": "lambda",
+          "named": true
+        },
+        {
           "type": "literal",
           "named": true
         },
@@ -830,6 +881,10 @@
     "named": true
   },
   {
+    "type": "append",
+    "named": true
+  },
+  {
     "type": "as",
     "named": false
   },
@@ -915,6 +970,10 @@
   },
   {
     "type": "{",
+    "named": false
+  },
+  {
+    "type": "|",
     "named": false
   },
   {

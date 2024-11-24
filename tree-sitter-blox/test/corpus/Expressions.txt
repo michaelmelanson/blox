@@ -96,3 +96,48 @@ x.a + y.b
         (object_index
           base: (term (identifier))
           index: (identifier))))))
+
+=======================
+Precedence for assignment
+=======================
+
+x.a = 3 + i
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term
+        (object_index
+          base: (term (identifier))
+          index: (identifier)))
+      operator: (assignment)
+      rhs: (binary_expression
+        lhs: (term (literal (number)))
+        operator: (add)
+        rhs: (term (identifier))))))
+
+=======================
+Precedence for lambda
+=======================
+
+repeat(n: 1, fn: |x| x + 1)
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (term (function_call
+      name:  (identifier)
+      argument: (argument
+        name: (identifier)
+        value: (term (literal (number))))
+      argument: (argument
+        name: (identifier)
+        value: (term (lambda
+          parameter: (identifier)
+          body: (binary_expression
+              lhs: (term (identifier))
+              operator: (add)
+              rhs: (term (literal (number)))))))))))
