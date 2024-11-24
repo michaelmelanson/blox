@@ -11,3 +11,4 @@ blox-assets = { path = "../blox-assets" }
 tree-sitter = "0.24.4"
 tree-sitter-blox = { path = "../tree-sitter-blox" }
 rust_decimal = { version = "1.36", default-features = false }
+tracing = { version = "0.1", default-features = false }

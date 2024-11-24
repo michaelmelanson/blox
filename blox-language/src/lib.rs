@@ -3,6 +3,7 @@ use std::result::Result;
 use ast::{Block, Expression, Operator};
 
 use rust_decimal::Decimal;
+use tracing::trace;
 use tree_sitter::Node;
 
 pub mod ast;
@@ -39,14 +40,21 @@ impl<'a> Parser<'a> {
             .set_language(&language.into())
             .expect("Error loading Blox parser");
         let tree = ts_parser.parse(source, None).unwrap();
-        println!("Tree: {}", tree.root_node().to_sexp());
 
         Parser { source, tree }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     pub fn parse(&self) -> Result<ast::Program, ParseError> {
+        trace!(source = self.source);
+
         let root = self.tree.root_node();
-        self.parse_program(root)
+        trace!(tree = root.to_sexp());
+
+        let ast = self.parse_program(root)?;
+        trace!(?ast);
+
+        Ok(ast)
     }
 
     pub fn parse_as_expression(&self) -> Result<ast::Expression, ParseError> {

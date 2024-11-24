@@ -206,6 +206,7 @@ version = "0.1.0"
 dependencies = [
  "blox-assets",
  "rust_decimal",
+ "tracing",
  "tree-sitter",
  "tree-sitter-blox",
 ]
