@@ -26,7 +26,7 @@ def circle_area(r) {
 (source_file
   statement: (definition
     name: (identifier)
-    parameters: (function_parameters (identifier))
+    parameter: (identifier)
     body: (block
       statement: (expression_statement
         expression: (binary_expression
@@ -51,9 +51,8 @@ def rectangle_area(l, w) {
 (source_file
   statement: (definition
     name: (identifier)
-    parameters: (function_parameters
-      (identifier)
-      (identifier))
+    parameter: (identifier)
+    parameter: (identifier)
     body: (block
       statement: (expression_statement
        expression: (binary_expression

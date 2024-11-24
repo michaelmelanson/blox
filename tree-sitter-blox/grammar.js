@@ -70,99 +70,38 @@ module.exports = grammar({
         1,
         choice(prec(3, seq($.negate, $.term)), prec(3, seq($.not, $.term))),
       ),
-    binary_expression: ($) =>
-      prec.right(
+    binary_expression: ($) => {
+      let operators = [
+        { operator: $.multiply, precedence: 2 },
+        { operator: $.divide, precedence: 2 },
+        { operator: $.concatenate, precedence: 1 },
+        { operator: $.add, precedence: 1 },
+        { operator: $.subtract, precedence: 1 },
+        { operator: $.multiply, precedence: 1 },
+        { operator: $.divide, precedence: 1 },
+        { operator: $.equal, precedence: 1 },
+        { operator: $.not_equal, precedence: 1 },
+        { operator: $.less_than, precedence: 1 },
+        { operator: $.less_or_equal, precedence: 1 },
+        { operator: $.greater_than, precedence: 1 },
+        { operator: $.greater_or_equal, precedence: 1 },
+      ];
+
+      return prec.right(
         choice(
-          prec.left(
-            2,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.multiply),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            2,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.divide),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.concatenate),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.add),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.subtract),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.equal),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.not_equal),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.greater_or_equal),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.greater_than),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.less_or_equal),
-              field("rhs", $._expression),
-            ),
-          ),
-          prec.left(
-            1,
-            seq(
-              field("lhs", $._expression),
-              field("operator", $.less_than),
-              field("rhs", $._expression),
+          ...operators.map((op) =>
+            prec.left(
+              op.precedence,
+              seq(
+                field("lhs", $._expression),
+                field("operator", op.operator),
+                field("rhs", $._expression),
+              ),
             ),
           ),
         ),
-      ),
+      );
+    },
     _value: ($) => choice($.literal, $.identifier, $.array, $.object),
     if_expression: ($) =>
       seq(

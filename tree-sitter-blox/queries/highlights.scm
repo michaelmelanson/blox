@@ -35,12 +35,9 @@
   "="
 ] @operator
 
-(definition name:[
-  (identifier) @function
-])
+(definition
+  name:(identifier) @function
+  parameter:(identifier) @parameter
+)
 
-(function_parameters (identifier) @parameter)
-
-(function_call name:[
-  (identifier) @function.call
-])
+(function_call name:(identifier) @function.call)
