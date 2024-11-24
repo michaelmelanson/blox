@@ -18,13 +18,13 @@ pub enum RuntimeError {
         condition_value: Value,
     },
     InvalidArrayIndex {
-        array_expression: ast::ExpressionTerm,
+        array_expression: ast::Expression,
         array_value: Value,
         index_expression: ast::Expression,
         index_value: Value,
     },
     ArrayIndexOutOfBounds {
-        array_expression: ast::ExpressionTerm,
+        array_expression: ast::Expression,
         array_value: Value,
         index_expression: ast::Expression,
         index_value: Value,
@@ -34,12 +34,12 @@ pub enum RuntimeError {
         value: Value,
     },
     NotAnObject {
-        object_expression: ast::ExpressionTerm,
+        object_expression: ast::Expression,
         object_value: Value,
         key: String,
     },
     ObjectKeyNotFound {
-        object_expression: ast::ExpressionTerm,
+        object_expression: ast::Expression,
         object_value: Value,
         key: String,
     },

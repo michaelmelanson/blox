@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use blox_language::{ast, parse};
+use blox_language::{ast, Parser};
 
 pub struct BloxProgram(ast::Program);
 
@@ -32,8 +32,9 @@ impl std::error::Error for BloxLoaderError {}
 impl blox_assets::Loader<BloxProgram> for BloxLoader {
     fn load(content: &[u8], _extension: &str) -> anyhow::Result<BloxProgram> {
         let input = String::from_utf8(content.to_vec())?;
-
-        parse(&input)
+        let parser = Parser::new(&input);
+        parser
+            .parse()
             .map_err(|err| Box::new(BloxLoaderError(format!("{:?}", err))).into())
             .map(BloxProgram)
     }

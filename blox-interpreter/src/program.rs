@@ -23,9 +23,14 @@ pub fn evaluate_block(block: &ast::Block, scope: &mut Arc<Scope>) -> Result<Valu
 
 #[cfg(test)]
 mod tests {
-    use blox_language::parse;
+    use blox_language::{ParseError, Parser};
 
     use super::*;
+
+    fn parse(code: &str) -> Result<ast::Program, ParseError> {
+        let parser = Parser::new(code);
+        parser.parse()
+    }
 
     fn assert_result(code: &str, expected: Value) {
         let program = match parse(code) {

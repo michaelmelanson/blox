@@ -113,14 +113,14 @@ impl std::fmt::Display for Parameter {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expression {
     Term(ExpressionTerm),
-    Operator(Box<Expression>, Operator, Box<Expression>),
+    BinaryExpression(Box<Expression>, Operator, Box<Expression>),
 }
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::Term(v) => write!(f, "{}", v),
-            Expression::Operator(lhs, operator, rhs) => {
+            Expression::BinaryExpression(lhs, operator, rhs) => {
                 write!(f, "({} {} {})", lhs, operator, rhs)
             }
         }
@@ -129,15 +129,15 @@ impl std::fmt::Display for Expression {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExpressionTerm {
+    If(If),
+    ArrayIndex(ArrayIndex),
+    ObjectIndex(ObjectIndex),
     FunctionCall(FunctionCall),
     Identifier(Identifier),
     Literal(Literal),
     Array(Array),
-    ArrayIndex(ArrayIndex),
     Object(Object),
-    ObjectIndex(ObjectIndex),
     Expression(Box<Expression>),
-    If(If),
 }
 
 impl std::fmt::Display for ExpressionTerm {
@@ -158,13 +158,13 @@ impl std::fmt::Display for ExpressionTerm {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArrayIndex {
-    pub array: Box<ExpressionTerm>,
+    pub base: Box<Expression>,
     pub index: Box<Expression>,
 }
 
 impl std::fmt::Display for ArrayIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}[{}]", self.array, self.index)
+        write!(f, "{}[{}]", self.base, self.index)
     }
 }
 
@@ -189,13 +189,13 @@ impl std::fmt::Display for Object {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectIndex {
-    pub object: Box<ExpressionTerm>,
-    pub key: String,
+    pub base: Box<Expression>,
+    pub index: Identifier,
 }
 
 impl std::fmt::Display for ObjectIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", self.object, self.key)
+        write!(f, "{}.{}", self.base, self.index)
     }
 }
 
@@ -236,9 +236,15 @@ impl std::fmt::Display for Array {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operator {
+    // unary
+    Negate,
+    Not,
+
+    // binary
     Add,
     Subtract,
     Multiply,
+    Divide,
     Concatenate,
     Equal,
     NotEqual,
@@ -251,9 +257,12 @@ pub enum Operator {
 impl std::fmt::Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Operator::Negate => write!(f, "-"),
+            Operator::Not => write!(f, "!"),
             Operator::Add => write!(f, "+"),
             Operator::Subtract => write!(f, "-"),
             Operator::Multiply => write!(f, "+"),
+            Operator::Divide => write!(f, "/"),
             Operator::Concatenate => write!(f, "++"),
             Operator::Equal => write!(f, "=="),
             Operator::NotEqual => write!(f, "!="),
@@ -295,14 +304,14 @@ impl std::fmt::Display for FunctionCall {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct If {
     pub condition: Box<Expression>,
-    pub then_branch: Block,
+    pub body: Block,
     pub elseif_branches: Vec<(Expression, Block)>,
     pub else_branch: Option<Block>,
 }
 
 impl std::fmt::Display for If {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if {} {{ {} }}", self.condition, self.then_branch)?;
+        write!(f, "if {} {{ {} }}", self.condition, self.body)?;
 
         for (condition, branch) in &self.elseif_branches {
             write!(f, "else if {} {{ {} }}", condition, branch)?;

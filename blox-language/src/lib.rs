@@ -1,33 +1,22 @@
 use std::result::Result;
 
 use ast::{Block, Expression, Operator};
-use parser::{BloxParser, Rule};
-use pest::{pratt_parser::PrattParser, Parser};
 
-use lazy_static::lazy_static;
 use rust_decimal::Decimal;
+use tree_sitter::Node;
 
 pub mod ast;
-pub mod parser;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
-    PestError(pest::error::Error<Rule>),
     DecimalError(rust_decimal::Error),
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::PestError(err) => write!(f, "{}", err),
             ParseError::DecimalError(err) => write!(f, "{}", err),
         }
-    }
-}
-
-impl From<pest::error::Error<Rule>> for ParseError {
-    fn from(err: pest::error::Error<Rule>) -> Self {
-        ParseError::PestError(err)
     }
 }
 
@@ -37,519 +26,465 @@ impl From<rust_decimal::Error> for ParseError {
     }
 }
 
-pub fn parse(code: &str) -> Result<ast::Program, ParseError> {
-    let mut result = BloxParser::parse(Rule::program, code)?;
-    assert_eq!(result.len(), 1);
-
-    let Some(pair) = result.next() else {
-        panic!("expected a single program rule, found none");
-    };
-
-    Ok(parse_program(pair)?)
+pub struct Parser<'a> {
+    source: &'a str,
+    tree: tree_sitter::Tree,
 }
 
-fn parse_program(pair: pest::iterators::Pair<Rule>) -> Result<ast::Program, ParseError> {
-    let mut block = None;
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::block => {
-                block = Some(parse_block(inner_pair)?);
+impl<'a> Parser<'a> {
+    pub fn new(source: &'a str) -> Self {
+        let mut ts_parser = tree_sitter::Parser::new();
+        let language = tree_sitter_blox::LANGUAGE;
+        ts_parser
+            .set_language(&language.into())
+            .expect("Error loading Blox parser");
+        let tree = ts_parser.parse(source, None).unwrap();
+        println!("Tree: {}", tree.root_node().to_sexp());
+
+        Parser { source, tree }
+    }
+
+    pub fn parse(&self) -> Result<ast::Program, ParseError> {
+        let root = self.tree.root_node();
+        self.parse_program(root)
+    }
+
+    pub fn parse_as_expression(&self) -> Result<ast::Expression, ParseError> {
+        let node = self
+            .tree
+            .root_node() // source file
+            .child(0)
+            .unwrap() // expression statement
+            .child(0)
+            .unwrap(); // expression
+
+        self.parse_expression(node)
+    }
+
+    fn value(&self, range: tree_sitter::Range) -> &str {
+        self.source
+            .get(range.start_byte..range.end_byte)
+            .expect("invalid range")
+    }
+
+    fn parse_program(&self, node: Node<'_>) -> Result<ast::Program, ParseError> {
+        let block = self.parse_block(node)?;
+        Ok(ast::Program(block))
+    }
+
+    fn parse_block(&self, node: Node<'_>) -> Result<ast::Block, ParseError> {
+        let mut statements = vec![];
+
+        let mut cursor = node.walk();
+        for child in node.children_by_field_name("statement", &mut cursor) {
+            statements.push(self.parse_statement(child)?);
+        }
+
+        Ok(ast::Block(statements))
+    }
+
+    fn parse_statement(&self, node: Node<'_>) -> Result<ast::Statement, ParseError> {
+        match node.kind() {
+            "definition" => {
+                let definition = self.parse_definition(node)?;
+                Ok(ast::Statement::Definition(definition))
             }
-            Rule::EOI => {}
-            rule => unimplemented!("program rule: {rule:?}"),
+            "binding" => {
+                let (lhs, rhs) = self.parse_binding(node)?;
+                Ok(ast::Statement::Binding(lhs, rhs))
+            }
+            "import" => {
+                let import = self.parse_import(node)?;
+                Ok(ast::Statement::Import(import))
+            }
+            "expression_statement" => {
+                let expression = self.parse_expression_container(node)?;
+                Ok(ast::Statement::Expression(expression))
+            }
+            kind => unimplemented!("statement kind: {kind}"),
         }
     }
 
-    Ok(ast::Program(block.expect("expected block")))
-}
+    fn parse_definition(&self, node: Node<'_>) -> Result<ast::Definition, ParseError> {
+        let name = self.parse_identifier(
+            node.child_by_field_name("name")
+                .expect("definition has no name"),
+        );
 
-fn parse_block(pair: pest::iterators::Pair<Rule>) -> Result<ast::Block, ParseError> {
-    let mut statements = vec![];
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::statement => {
-                statements.push(parse_statement(inner_pair)?);
+        let body = self.parse_block(
+            node.child_by_field_name("body")
+                .expect("definition has no body"),
+        );
+
+        let mut parameters = vec![];
+        for child in node.children_by_field_name("parameter", &mut node.walk()) {
+            parameters.push(ast::Parameter(self.parse_identifier(child)?));
+        }
+
+        Ok(ast::Definition {
+            name: name.expect("expected name"),
+            parameters,
+            body: body.expect("expected body"),
+        })
+    }
+
+    fn parse_binding(
+        &self,
+        node: Node<'_>,
+    ) -> Result<(ast::Identifier, ast::Expression), ParseError> {
+        let name = self.parse_identifier(
+            node.child_by_field_name("name")
+                .expect("binding has no name"),
+        )?;
+
+        let value = self.parse_expression(
+            node.child_by_field_name("value")
+                .expect("binding has no value"),
+        )?;
+
+        Ok((name, value))
+    }
+
+    pub fn parse_import(&self, node: Node<'_>) -> Result<ast::Import, ParseError> {
+        let mut symbols = vec![];
+        let mut path = None;
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "imported_symbol" {
+                symbols.push(self.parse_imported_symbol(child)?);
+            } else if child.kind() == "string" {
+                path = Some(self.parse_string(child)?);
             }
-            rule => unimplemented!("block rule: {rule:?}"),
+        }
+
+        let path = path.expect("expected path");
+
+        Ok(ast::Import(symbols, path))
+    }
+
+    fn parse_imported_symbol(&self, node: Node<'_>) -> Result<ast::ImportedSymbol, ParseError> {
+        let name = self.parse_identifier(
+            node.child_by_field_name("identifier")
+                .expect("imported symbol has no identifier"),
+        )?;
+
+        let mut alias = None;
+
+        if let Some(node) = node.child_by_field_name("alias") {
+            alias = Some(self.parse_identifier(node)?);
+        }
+
+        Ok(ast::ImportedSymbol(name, alias))
+    }
+
+    pub fn parse_expression_container(
+        &self,
+        node: Node<'_>,
+    ) -> Result<ast::Expression, ParseError> {
+        let expression = self.parse_expression(node.child_by_field_name("expression").expect(
+            &format!("expression statement has no expression: {}", node.to_sexp()),
+        ))?;
+
+        Ok(expression)
+    }
+
+    fn parse_expression(&self, node: Node<'_>) -> Result<ast::Expression, ParseError> {
+        match node.kind() {
+            "term" => Ok(Expression::Term(self.parse_expression_term(node)?)),
+            "binary_expression" => {
+                let (lhs, operator, rhs) = self.parse_binary_expression(node)?;
+                Ok(Expression::BinaryExpression(lhs, operator, rhs))
+            }
+            kind => unimplemented!("expression kind: {kind}"),
         }
     }
 
-    Ok(ast::Block(statements))
-}
-
-fn parse_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement, ParseError> {
-    let mut result = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::definition => {
-                let definition = parse_definition(inner_pair)?;
-                result = Some(ast::Statement::Definition(definition));
-            }
-            Rule::binding => {
-                let (lhs, rhs) = parse_binding(inner_pair)?;
-                result = Some(ast::Statement::Binding(lhs, rhs));
-            }
-            Rule::import => {
-                let import = parse_import(inner_pair)?;
-                result = Some(ast::Statement::Import(import));
-            }
-            Rule::expression => {
-                let expression = parse_expression(inner_pair)?;
-                result = Some(ast::Statement::Expression(expression));
-            }
-            rule => unimplemented!("statement rule: {rule:?}"),
-        }
-    }
-
-    Ok(result.expect("expected statement"))
-}
-
-fn parse_definition(pair: pest::iterators::Pair<Rule>) -> Result<ast::Definition, ParseError> {
-    let mut name = None;
-    let mut parameters = vec![];
-    let mut body = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier if name == None => {
-                name = Some(parse_identifier(inner_pair)?);
-            }
-            Rule::identifier => {
-                parameters.push(ast::Parameter(parse_identifier(inner_pair)?));
-            }
-            Rule::block => {
-                body = Some(parse_block(inner_pair)?);
-            }
-            rule => unimplemented!("definition rule: {rule:?}"),
-        }
-    }
-
-    Ok(ast::Definition {
-        name: name.expect("expected name"),
-        parameters,
-        body: body.expect("expected body"),
-    })
-}
-
-fn parse_binding(
-    pair: pest::iterators::Pair<Rule>,
-) -> Result<(ast::Identifier, ast::Expression), ParseError> {
-    let mut lhs = None;
-    let mut rhs = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier => {
-                lhs = Some(parse_identifier(inner_pair)?);
-            }
-            Rule::expression => {
-                rhs = Some(parse_expression(inner_pair)?);
-            }
-            rule => unimplemented!("binding rule: {rule:?}"),
-        }
-    }
-
-    Ok((lhs.expect("expected lhs"), rhs.expect("expected rhs")))
-}
-
-pub fn parse_import(pair: pest::iterators::Pair<Rule>) -> Result<ast::Import, ParseError> {
-    let mut symbols = vec![];
-    let mut path = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::imported_symbol => {
-                symbols.push(parse_imported_symbol(inner_pair)?);
-            }
-            Rule::string => {
-                path = Some(parse_string(inner_pair)?);
-            }
-            rule => unimplemented!("import rule: {rule:?}"),
-        }
-    }
-
-    let path = path.expect("expected path");
-
-    Ok(ast::Import(symbols, path))
-}
-
-fn parse_imported_symbol(
-    pair: pest::iterators::Pair<Rule>,
-) -> Result<ast::ImportedSymbol, ParseError> {
-    let mut name = None;
-    let mut alias = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier => {
-                if name == None {
-                    name = Some(parse_identifier(inner_pair)?);
-                } else {
-                    alias = Some(parse_identifier(inner_pair)?);
+    fn parse_expression_term(&self, node: Node<'_>) -> Result<ast::ExpressionTerm, ParseError> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "if_expression" => {
+                    return Ok(ast::ExpressionTerm::If(self.parse_if_expression(child)?))
                 }
+                "array_index" => {
+                    return Ok(ast::ExpressionTerm::ArrayIndex(
+                        self.parse_array_index(child)?,
+                    ))
+                }
+                "object_index" => {
+                    return Ok(ast::ExpressionTerm::ObjectIndex(
+                        self.parse_object_index(child)?,
+                    ))
+                }
+                "function_call" => {
+                    return Ok(ast::ExpressionTerm::FunctionCall(
+                        self.parse_function_call(child)?,
+                    ))
+                }
+                "literal" => return Ok(ast::ExpressionTerm::Literal(self.parse_literal(child)?)),
+                "identifier" => {
+                    return Ok(ast::ExpressionTerm::Identifier(
+                        self.parse_identifier(child)?,
+                    ))
+                }
+                "array" => return Ok(ast::ExpressionTerm::Array(self.parse_array(child)?)),
+                "object" => return Ok(ast::ExpressionTerm::Object(self.parse_object(child)?)),
+                "group_term" => {
+                    return Ok(ast::ExpressionTerm::Expression(Box::new(
+                        self.parse_expression_container(child)?,
+                    )))
+                }
+                kind => unimplemented!("expression term kind: {kind}"),
             }
-            rule => unimplemented!("imported symbol rule: {rule:?}"),
+        }
+
+        unreachable!();
+    }
+
+    fn parse_binary_expression(
+        &self,
+        node: Node<'_>,
+    ) -> Result<(Box<Expression>, Operator, Box<Expression>), ParseError> {
+        let lhs = self.parse_expression(
+            node.child_by_field_name("lhs")
+                .expect("binary expression has no left"),
+        )?;
+
+        let operator = self.parse_operator(
+            node.child_by_field_name("operator")
+                .expect("binary expression has no operator"),
+        )?;
+
+        let rhs = self.parse_expression(
+            node.child_by_field_name("rhs")
+                .expect("binary expression has no right"),
+        )?;
+
+        Ok((Box::new(lhs), operator, Box::new(rhs)))
+    }
+
+    fn parse_identifier(&self, node: Node<'_>) -> Result<ast::Identifier, ParseError> {
+        let identifier = self.value(node.range());
+        Ok(ast::Identifier(identifier.to_string()))
+    }
+
+    fn parse_literal(&self, node: Node<'_>) -> Result<ast::Literal, ParseError> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "boolean" => {
+                    if child.child(0).unwrap().kind() == "boolean_true" {
+                        return Ok(ast::Literal::Boolean(true));
+                    } else {
+                        return Ok(ast::Literal::Boolean(false));
+                    }
+                }
+                "number" => {
+                    let value = self.value(child.range());
+                    let number = Decimal::from_str_radix(value, 10)?;
+                    return Ok(ast::Literal::Number(number));
+                }
+                "string" => {
+                    let s = self.parse_string(child)?;
+                    return Ok(ast::Literal::String(s));
+                }
+                "symbol" => {
+                    let value = self.value(child.range());
+                    return Ok(ast::Literal::Symbol(value.to_string()));
+                }
+                _ => {}
+            }
+        }
+        unreachable!()
+    }
+
+    fn parse_operator(&self, node: Node<'_>) -> Result<Operator, ParseError> {
+        match node.kind() {
+            "not" => Ok(Operator::Not),
+            "negate" => Ok(Operator::Negate),
+            "multiply" => Ok(Operator::Multiply),
+            "divide" => Ok(Operator::Divide),
+            "concatenate" => Ok(Operator::Concatenate),
+            "add" => Ok(Operator::Add),
+            "subtract" => Ok(Operator::Subtract),
+            "equal" => Ok(Operator::Equal),
+            "not_equal" => Ok(Operator::NotEqual),
+            "greater_or_equal" => Ok(Operator::GreaterOrEqual),
+            "greater_than" => Ok(Operator::GreaterThan),
+            "less_or_equal" => Ok(Operator::LessOrEqual),
+            "less_than" => Ok(Operator::LessThan),
+            kind => unimplemented!("operator kind: {kind}"),
         }
     }
 
-    let name = name.expect("expected name");
+    fn parse_string(&self, node: Node<'_>) -> Result<String, ParseError> {
+        let s = self.value(node.range());
 
-    Ok(ast::ImportedSymbol(name, alias))
-}
+        // strip off the quotes at either end
+        let s = s.get(1..s.len() - 1).expect("expected inner pair");
 
-pub fn parse_expression_string(code: &str) -> Result<ast::Expression, ParseError> {
-    let mut result = BloxParser::parse(Rule::expression, code)?;
-    assert_eq!(result.len(), 1);
+        Ok(s.to_string())
+    }
 
-    let Some(pair) = result.next() else {
-        unreachable!("expected a single expression rule, found none");
-    };
+    fn parse_function_call(&self, node: Node<'_>) -> Result<ast::FunctionCall, ParseError> {
+        let identifier = self.parse_identifier(
+            node.child_by_field_name("name")
+                .expect("function call without name"),
+        )?;
 
-    parse_expression(pair)
-}
+        let mut arguments = vec![];
+        for child in node.children_by_field_name("argument", &mut node.walk()) {
+            arguments.push(self.parse_argument(child)?);
+        }
 
-lazy_static! {
-    static ref EXPRESSION_PARSER: PrattParser<Rule> = {
-        use pest::pratt_parser::{Assoc::*, Op};
-        use Rule::*;
+        Ok(ast::FunctionCall(identifier, arguments))
+    }
 
-        // Precedence is defined lowest to highest
-        PrattParser::new()
-            .op(Op::infix(add, Left)
-                | Op::infix(subtract, Left)
-                | Op::infix(concatenate, Left))
-            .op(Op::infix(multiply, Left))
-            .op(Op::infix(equal, Left)
-                | Op::infix(not_equal, Left)
-                | Op::infix(less_or_equal, Left)
-                | Op::infix(less_than, Left)
-                | Op::infix(greater_or_equal, Left)
-                | Op::infix(greater_than, Left))
-    };
-}
+    fn parse_array(&self, node: Node<'_>) -> Result<ast::Array, ParseError> {
+        let mut members = vec![];
 
-fn parse_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression, ParseError> {
-    EXPRESSION_PARSER
-        .map_primary(|primary| match primary.as_rule() {
-            Rule::expression_term => Ok(ast::Expression::Term(parse_expression_term(primary)?)),
-            rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+        let mut cursor = node.walk();
+        for child in node.children_by_field_name("member", &mut cursor) {
+            members.push(self.parse_expression(child)?);
+        }
+
+        Ok(ast::Array(members))
+    }
+
+    fn parse_array_index(&self, node: Node<'_>) -> Result<ast::ArrayIndex, ParseError> {
+        let base = self.parse_expression(
+            node.child_by_field_name("base")
+                .expect("array index with no base"),
+        )?;
+
+        let index = self.parse_expression(
+            node.child_by_field_name("index")
+                .expect("array index with no index"),
+        )?;
+
+        Ok(ast::ArrayIndex {
+            base: Box::new(base),
+            index: Box::new(index),
         })
-        .map_infix(|lhs, op, rhs| {
-            let op = match op.as_rule() {
-                Rule::add => Operator::Add,
-                Rule::subtract => Operator::Subtract,
-                Rule::multiply => Operator::Multiply,
-                Rule::concatenate => Operator::Concatenate,
-                Rule::equal => Operator::Equal,
-                Rule::not_equal => Operator::NotEqual,
-                Rule::greater_or_equal => Operator::GreaterOrEqual,
-                Rule::greater_than => Operator::GreaterThan,
-                Rule::less_or_equal => Operator::LessOrEqual,
-                Rule::less_than => Operator::LessThan,
-                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
-            };
-            Ok(Expression::Operator(Box::new(lhs?), op, Box::new(rhs?)))
+    }
+
+    fn parse_object(&self, node: Node<'_>) -> Result<ast::Object, ParseError> {
+        let mut members = vec![];
+
+        let mut cursor = node.walk();
+        for child in node.children_by_field_name("member", &mut cursor) {
+            members.push(self.parse_object_member(child)?);
+        }
+
+        Ok(ast::Object(members))
+    }
+
+    fn parse_object_member(&self, node: Node<'_>) -> Result<(String, Expression), ParseError> {
+        let key = self.parse_identifier(
+            node.child_by_field_name("key")
+                .expect("object member without key"),
+        )?;
+
+        let value = self.parse_expression(
+            node.child_by_field_name("value")
+                .expect("object member without value"),
+        )?;
+
+        Ok((key.0, value))
+    }
+
+    fn parse_object_index(&self, node: Node<'_>) -> Result<ast::ObjectIndex, ParseError> {
+        let base = self.parse_expression(
+            node.child_by_field_name("base")
+                .expect("object index without base"),
+        )?;
+
+        let index = self.parse_identifier(
+            node.child_by_field_name("index")
+                .expect("object index without index"),
+        )?;
+
+        Ok(ast::ObjectIndex {
+            base: Box::new(base),
+            index,
         })
-        .parse(pair.into_inner())
-}
-
-fn parse_expression_term(
-    pair: pest::iterators::Pair<Rule>,
-) -> Result<ast::ExpressionTerm, ParseError> {
-    let inner_pair = pair.into_inner().next().expect("expected inner pair");
-    match inner_pair.as_rule() {
-        Rule::literal => Ok(ast::ExpressionTerm::Literal(parse_literal(inner_pair)?)),
-        Rule::identifier => Ok(ast::ExpressionTerm::Identifier(parse_identifier(
-            inner_pair,
-        )?)),
-        Rule::expression => Ok(ast::ExpressionTerm::Expression(Box::new(parse_expression(
-            inner_pair,
-        )?))),
-        Rule::function_call => Ok(ast::ExpressionTerm::FunctionCall(parse_function_call(
-            inner_pair,
-        )?)),
-        Rule::array => Ok(ast::ExpressionTerm::Array(parse_array(inner_pair)?)),
-        Rule::array_index => Ok(ast::ExpressionTerm::ArrayIndex(parse_array_index(
-            inner_pair,
-        )?)),
-        Rule::object => Ok(ast::ExpressionTerm::Object(parse_object(inner_pair)?)),
-        Rule::object_index => Ok(ast::ExpressionTerm::ObjectIndex(parse_object_index(
-            inner_pair,
-        )?)),
-        Rule::if_expression => Ok(ast::ExpressionTerm::If(parse_if_expression(inner_pair)?)),
-        rule => unimplemented!("term expression rule: {rule:?}"),
-    }
-}
-
-fn parse_identifier(pair: pest::iterators::Pair<Rule>) -> Result<ast::Identifier, ParseError> {
-    Ok(ast::Identifier(pair.as_str().trim().to_string()))
-}
-
-fn parse_literal(pair: pest::iterators::Pair<Rule>) -> Result<ast::Literal, ParseError> {
-    let inner_pair = pair.into_inner().next().expect("expected inner pair");
-    match inner_pair.as_rule() {
-        Rule::boolean_true => Ok(ast::Literal::Boolean(true)),
-        Rule::boolean_false => Ok(ast::Literal::Boolean(false)),
-        Rule::number => {
-            let number = Decimal::from_str_radix(inner_pair.as_str(), 10)?;
-            Ok(ast::Literal::Number(number))
-        }
-        Rule::string => {
-            let s = parse_string(inner_pair)?;
-            Ok(ast::Literal::String(s))
-        }
-        Rule::symbol => Ok(ast::Literal::Symbol(inner_pair.as_str().trim().to_string())),
-        rule => unimplemented!("literal rule: {rule:?}"),
-    }
-}
-
-fn parse_string(pair: pest::iterators::Pair<Rule>) -> Result<String, ParseError> {
-    let s = pair.as_str();
-
-    // strip off the quotes at either end
-    let s = s.get(1..s.len() - 1).expect("expected inner pair");
-
-    Ok(s.to_string())
-}
-
-fn parse_function_call(pair: pest::iterators::Pair<Rule>) -> Result<ast::FunctionCall, ParseError> {
-    let mut identifier = None;
-    let mut arguments = vec![];
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier => {
-                identifier = Some(parse_identifier(inner_pair)?);
-            }
-            Rule::argument => {
-                arguments.push(parse_argument(inner_pair)?);
-            }
-            rule => unimplemented!("function call rule: {rule:?}"),
-        }
     }
 
-    Ok(ast::FunctionCall(
-        identifier.expect("expected function name"),
-        arguments,
-    ))
-}
+    fn parse_if_expression(&self, node: Node<'_>) -> Result<ast::If, ParseError> {
+        let condition = self.parse_expression(
+            node.child_by_field_name("condition")
+                .expect("if expression without condition"),
+        )?;
 
-fn parse_array(pair: pest::iterators::Pair<Rule>) -> Result<ast::Array, ParseError> {
-    let mut members = vec![];
+        let body = self.parse_block(
+            node.child_by_field_name("body")
+                .expect("if expression without body"),
+        )?;
 
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::expression => {
-                members.push(parse_expression(inner_pair)?);
-            }
-            rule => unimplemented!("array rule: {rule:?}"),
+        let mut elseif_branches = vec![];
+        let mut cursor = node.walk();
+        for child in node.children_by_field_name("elseif", &mut cursor) {
+            elseif_branches.push(self.parse_elseif_expression(child)?);
         }
+
+        let mut else_branch = None;
+        if let Some(else_node) = node.child_by_field_name("else") {
+            else_branch = Some(self.parse_else_expression(else_node)?);
+        }
+
+        Ok(ast::If {
+            condition: Box::new(condition),
+            body,
+            elseif_branches,
+            else_branch,
+        })
     }
 
-    Ok(ast::Array(members))
-}
+    fn parse_elseif_expression(&self, node: Node<'_>) -> Result<(Expression, Block), ParseError> {
+        let condition = self.parse_expression(
+            node.child_by_field_name("condition")
+                .expect("else if without condition"),
+        )?;
 
-fn parse_array_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ArrayIndex, ParseError> {
-    let mut array = None;
-    let mut index = None;
+        let body = self.parse_block(
+            node.child_by_field_name("body")
+                .expect("else if without body"),
+        )?;
 
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier if array == None => {
-                array = Some(ast::ExpressionTerm::Identifier(parse_identifier(
-                    inner_pair,
-                )?));
-            }
-            Rule::function_call if array == None => {
-                array = Some(ast::ExpressionTerm::FunctionCall(parse_function_call(
-                    inner_pair,
-                )?));
-            }
-            Rule::array if index == None => {
-                array = Some(ast::ExpressionTerm::Array(parse_array(inner_pair)?));
-            }
-            Rule::expression if index == None => {
-                index = Some(parse_expression(inner_pair)?);
-            }
-            rule => unreachable!("unexpected {rule:?}"),
-        }
+        Ok((condition, body))
     }
 
-    Ok(ast::ArrayIndex {
-        array: Box::new(array.expect("expected array name")),
-        index: Box::new(index.expect("expected array index")),
-    })
-}
+    fn parse_else_expression(&self, node: Node<'_>) -> Result<Block, ParseError> {
+        let block =
+            self.parse_block(node.child_by_field_name("body").expect("else without body"))?;
 
-fn parse_object(pair: pest::iterators::Pair<Rule>) -> Result<ast::Object, ParseError> {
-    let mut members = vec![];
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::object_member => {
-                members.push(parse_object_member(inner_pair)?);
-            }
-            rule => unreachable!("object rule: {rule:?}"),
-        }
+        Ok(block)
     }
 
-    Ok(ast::Object(members))
-}
+    fn parse_argument(&self, node: Node<'_>) -> Result<ast::Argument, ParseError> {
+        let name = self.parse_identifier(
+            node.child_by_field_name("name")
+                .expect("argument without name"),
+        )?;
 
-fn parse_object_member(
-    pair: pest::iterators::Pair<Rule>,
-) -> Result<(String, Expression), ParseError> {
-    let mut key = None;
-    let mut value = None;
+        let value = self.parse_expression(
+            node.child_by_field_name("value")
+                .expect("argument without value"),
+        )?;
 
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier => {
-                key = Some(inner_pair.as_str().trim().to_string());
-            }
-            Rule::expression => {
-                value = Some(parse_expression(inner_pair)?);
-            }
-            rule => unreachable!("object member rule: {rule:?}"),
-        }
+        Ok(ast::Argument(name, value))
     }
-
-    Ok((
-        key.expect("expected object key"),
-        value.expect("expected object value"),
-    ))
-}
-
-fn parse_object_index(pair: pest::iterators::Pair<Rule>) -> Result<ast::ObjectIndex, ParseError> {
-    let mut object = None;
-    let mut key = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier if object == None => {
-                object = Some(ast::ExpressionTerm::Identifier(parse_identifier(
-                    inner_pair,
-                )?));
-            }
-            Rule::function_call if object == None => {
-                object = Some(ast::ExpressionTerm::FunctionCall(parse_function_call(
-                    inner_pair,
-                )?));
-            }
-            Rule::object if object == None => {
-                object = Some(ast::ExpressionTerm::Object(parse_object(inner_pair)?));
-            }
-            Rule::identifier if key == None => {
-                key = Some(inner_pair.as_str().trim().to_string());
-            }
-            rule => unreachable!("unexpected {rule:?}"),
-        }
-    }
-
-    Ok(ast::ObjectIndex {
-        object: Box::new(object.expect("expected object name")),
-        key: key.expect("expected object key"),
-    })
-}
-
-fn parse_if_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::If, ParseError> {
-    let mut condition = None;
-    let mut then_branch = None;
-    let mut elseif_branches = vec![];
-    let mut else_branch = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::expression => {
-                condition = Some(parse_expression(inner_pair)?);
-            }
-            Rule::block if then_branch == None => {
-                then_branch = Some(parse_block(inner_pair)?);
-            }
-            Rule::elseif_expression => {
-                elseif_branches.push(parse_elseif_expression(inner_pair)?);
-            }
-            Rule::else_expression => {
-                else_branch = Some(parse_else_expression(inner_pair)?);
-            }
-            rule => unreachable!("if expression rule: {rule:?}"),
-        }
-    }
-
-    Ok(ast::If {
-        condition: Box::new(condition.expect("expected condition")),
-        then_branch: then_branch.expect("expected then block"),
-        elseif_branches,
-        else_branch,
-    })
-}
-
-fn parse_elseif_expression(
-    pair: pest::iterators::Pair<Rule>,
-) -> Result<(Expression, Block), ParseError> {
-    let mut condition = None;
-    let mut block = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::expression => {
-                condition = Some(parse_expression(inner_pair)?);
-            }
-            Rule::block => {
-                block = Some(parse_block(inner_pair)?);
-            }
-            rule => unreachable!("elseif expression rule: {rule:?}"),
-        }
-    }
-
-    Ok((
-        condition.expect("expected condition"),
-        block.expect("expected block"),
-    ))
-}
-
-fn parse_else_expression(pair: pest::iterators::Pair<Rule>) -> Result<Block, ParseError> {
-    let mut block = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::block => {
-                block = Some(parse_block(inner_pair)?);
-            }
-            rule => unreachable!("else expression rule: {rule:?}"),
-        }
-    }
-
-    Ok(block.expect("expected block"))
-}
-
-fn parse_argument(pair: pest::iterators::Pair<Rule>) -> Result<ast::Argument, ParseError> {
-    let mut identifier = None;
-    let mut value = None;
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::identifier => {
-                identifier = Some(parse_identifier(inner_pair)?);
-            }
-            Rule::expression => {
-                value = Some(parse_expression(inner_pair)?);
-            }
-            rule => unreachable!("argument rule: {rule:?}"),
-        }
-    }
-
-    Ok(ast::Argument(
-        identifier.expect("expected argument name"),
-        value.expect("expected argument value"),
-    ))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ast;
-    use crate::parse;
+    use crate::{ast, ParseError, Parser};
+
+    fn parse(input: &str) -> Result<ast::Program, ParseError> {
+        let parser = Parser::new(input);
+        parser.parse()
+    }
 
     #[test]
     fn parse_let_bindings() {
@@ -571,7 +506,7 @@ mod tests {
         assert_eq!(
             ast::Program(ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
-                ast::Expression::Operator(
+                ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
                         ast::Literal::Number(55.into())
                     ))),
@@ -591,9 +526,9 @@ mod tests {
         assert_eq!(
             ast::Program(ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
-                ast::Expression::Operator(
+                ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Expression(
-                        Box::new(ast::Expression::Operator(
+                        Box::new(ast::Expression::BinaryExpression(
                             Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
                                 ast::Literal::Number(1.into())
                             ))),

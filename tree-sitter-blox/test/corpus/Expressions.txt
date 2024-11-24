@@ -1,0 +1,98 @@
+===============
+Basic expressions
+:fail_fast
+===============
+
+1 + 1
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term (literal (number)))
+      operator: (add)
+      rhs: (term (literal (number))))))
+
+===============
+Nesting
+===============
+
+1 + (b * "foo")
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term (literal (number)))
+      operator: (add)
+      rhs: (term
+        (group_term
+          expression: (binary_expression
+            lhs: (term (identifier))
+            operator: (multiply)
+            rhs: (term (literal (string)))))))))
+
+=======================
+Precedence for multiplication
+=======================
+
+a*b+c*d
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (binary_expression
+        lhs: (term (identifier))
+        operator: (multiply)
+        rhs: (term (identifier)))
+      operator: (add)
+      rhs: (binary_expression
+        lhs: (term (identifier))
+        operator: (multiply)
+        rhs: (term (identifier))))))
+
+=======================
+Precedence for division
+=======================
+
+a/b + c/d
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (binary_expression
+        lhs: (term (identifier))
+        operator: (divide)
+        rhs: (term (identifier)))
+      operator: (add)
+      rhs: (binary_expression
+        lhs: (term (identifier))
+        operator: (divide)
+        rhs: (term (identifier))))))
+
+=======================
+Precedence for object indexing
+=======================
+
+x.a + y.b
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (binary_expression
+      lhs: (term
+        (object_index
+          base: (term (identifier))
+          index: (identifier)))
+      operator: (add)
+      rhs: (term
+        (object_index
+          base: (term (identifier))
+          index: (identifier))))))

@@ -1,0 +1,9 @@
+
+let text = "hello"
+let text2 = "world"
+
+def greet(text)
+  print(message: text)
+end
+
+greet(text: text ++ text_two)

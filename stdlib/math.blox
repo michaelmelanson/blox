@@ -1,0 +1,6 @@
+
+let pi = 3.14159265359
+def circle_area(r) {
+    # pi * r^2
+    pi * r * r
+}

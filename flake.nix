@@ -16,6 +16,8 @@
         pkgs.iconv
         pkgs.rustc
         pkgs.tailwindcss
+        pkgs.tree-sitter
+        pkgs.lldb
         frameworks.SystemConfiguration
         frameworks.CoreServices
       ];

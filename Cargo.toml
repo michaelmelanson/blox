@@ -6,4 +6,5 @@ members = [
     "blox-language",
     "blox-persistence",
     "blox-server",
+    "tree-sitter-blox",
 ]

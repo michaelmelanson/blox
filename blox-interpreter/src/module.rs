@@ -8,7 +8,12 @@ pub fn load_module(path: &str) -> Result<Module, RuntimeError> {
     let filename = format!("{}.blox", path);
     let source = std::fs::read_to_string(&filename)
         .map_err(|_| RuntimeError::ModuleNotFound(filename.clone()))?;
-    let ast = blox_language::parse(&source)?;
+    load_module_from_string(path, &source)
+}
+
+pub fn load_module_from_string(path: &str, source: &str) -> Result<Module, RuntimeError> {
+    let parser = blox_language::Parser::new(source);
+    let ast = parser.parse()?;
     let module = evalute_module(&path, ast)?;
     Ok(module)
 }

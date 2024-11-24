@@ -1,8 +1,11 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
-use blox_language::ast::{self, ArrayIndex, If, Object, ObjectIndex};
+use blox_language::ast::{self, Argument, ArrayIndex, If, Object, ObjectIndex};
 
-use crate::{program::evaluate_block, value::Function, RuntimeError, Scope, Value};
+use crate::{program::evaluate_block, value::Function, Intrinsic, RuntimeError, Scope, Value};
 
 pub fn evaluate_expression(
     expression: &ast::Expression,
@@ -10,7 +13,7 @@ pub fn evaluate_expression(
 ) -> Result<Value, RuntimeError> {
     match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, scope),
-        ast::Expression::Operator(lhs, operator, rhs) => {
+        ast::Expression::BinaryExpression(lhs, operator, rhs) => {
             let lhs_value = evaluate_expression(lhs, scope)?;
             let rhs_value = evaluate_expression(rhs, scope)?;
 
@@ -114,15 +117,15 @@ pub fn evaluate_expression_term(
             }
             Ok(Value::Array(members))
         }
-        ast::ExpressionTerm::ArrayIndex(ArrayIndex { array, index }) => {
-            let array_value = evaluate_expression_term(array, scope)?;
+        ast::ExpressionTerm::ArrayIndex(ArrayIndex { base, index }) => {
+            let array_value = evaluate_expression(base, scope)?;
             let index_value = evaluate_expression(index, scope)?;
 
             match (&array_value, &index_value) {
                 (Value::Array(ref members), Value::Number(idx)) => {
                     let Ok(idx): rust_decimal::Result<usize> = (*idx).try_into() else {
                         return Err(RuntimeError::InvalidArrayIndex {
-                            array_expression: *array.clone(),
+                            array_expression: *base.clone(),
                             array_value: array_value.clone(),
                             index_expression: *index.clone(),
                             index_value: index_value.clone(),
@@ -133,7 +136,7 @@ pub fn evaluate_expression_term(
                         Ok(members[idx].clone())
                     } else {
                         Err(RuntimeError::ArrayIndexOutOfBounds {
-                            array_expression: *array.clone(),
+                            array_expression: *base.clone(),
                             array_value: array_value.clone(),
                             index_expression: *index.clone(),
                             index_value: index_value.clone(),
@@ -141,7 +144,7 @@ pub fn evaluate_expression_term(
                     }
                 }
                 (array_value, index_value) => Err(RuntimeError::InvalidArrayIndex {
-                    array_expression: *array.clone(),
+                    array_expression: *base.clone(),
                     array_value: array_value.clone(),
                     index_expression: *index.clone(),
                     index_value: index_value.clone(),
@@ -156,36 +159,36 @@ pub fn evaluate_expression_term(
             }
             Ok(Value::Object(object))
         }
-        ast::ExpressionTerm::ObjectIndex(ObjectIndex { object, key }) => {
-            let object_value = evaluate_expression_term(object, scope)?;
+        ast::ExpressionTerm::ObjectIndex(ObjectIndex { base, index }) => {
+            let object_value = evaluate_expression(base, scope)?;
 
             match object_value {
                 Value::Object(ref members) => {
-                    if let Some(value) = members.get(key) {
+                    if let Some(value) = members.get(&index.0) {
                         Ok(value.clone())
                     } else {
                         Err(RuntimeError::ObjectKeyNotFound {
-                            object_expression: *object.clone(),
+                            object_expression: *base.clone(),
                             object_value: object_value.clone(),
-                            key: key.clone(),
+                            key: index.0.clone(),
                         })
                     }
                 }
                 object_value => Err(RuntimeError::NotAnObject {
-                    object_expression: *object.clone(),
+                    object_expression: *base.clone(),
                     object_value: object_value.clone(),
-                    key: key.clone(),
+                    key: index.0.clone(),
                 }),
             }
         }
         ast::ExpressionTerm::If(If {
             condition,
-            then_branch,
+            body,
             elseif_branches,
             else_branch,
         }) => {
             if evaluate_condition(condition, scope)? {
-                return evaluate_block(then_branch, scope);
+                return evaluate_block(body, scope);
             }
 
             for elseif_branch in elseif_branches {
@@ -237,11 +240,27 @@ pub fn evaluate_function_call(
             let mut call_scope = closure.child();
 
             for (parameter, argument) in definition.parameters.iter().zip(&function_call.1) {
+                let name = &parameter.0;
                 let value = evaluate_expression(&argument.1, scope)?;
-                call_scope.insert_binding(&parameter.0, value);
+
+                call_scope.insert_binding(name, value);
             }
 
             evaluate_block(&definition.body, &mut call_scope)
+        }
+        Value::Intrinsic(Intrinsic {
+            id: _,
+            name: _,
+            function,
+        }) => {
+            let mut parameters = HashMap::new();
+
+            for Argument(name, rhs) in function_call.1.iter() {
+                let value = evaluate_expression(&rhs, scope)?;
+                parameters.insert(name.clone(), value);
+            }
+
+            function(parameters)
         }
         _ => Err(RuntimeError::NotAFunction {
             identifier: function_call.0.clone(),
@@ -264,7 +283,8 @@ mod tests {
     use super::evaluate_expression;
 
     fn parse_expression<'a>(code: String) -> Result<Expression, ParseError> {
-        Ok(blox_language::parse_expression_string(&code)?)
+        let parser = blox_language::Parser::new(&code);
+        Ok(parser.parse_as_expression()?)
     }
 
     #[test]

@@ -1,0 +1,25 @@
+=========
+Numbers
+=========
+
+55
+
+---
+
+(source_file
+  (expression_statement
+    (term (literal (number)))))
+
+
+
+========
+Strings
+========
+
+"hello world"
+
+---
+
+(source_file
+  (expression_statement
+    (term (literal (string)))))

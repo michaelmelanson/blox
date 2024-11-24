@@ -1,0 +1,27 @@
+===========
+Line comments
+===========
+
+# Line comment
+def  # Line comment
+empty  # Line comment
+()  # Line comment
+{ # Line comment
+  # Line comment
+} # Line comment
+# Line comment
+
+---
+
+(source_file
+  (comment)
+  statement: (definition
+    (comment)
+    name: (identifier)
+    (comment)
+    (comment)
+    body: (block
+      (comment)
+      (comment)))
+  (comment)
+  (comment))

@@ -88,7 +88,7 @@ mod test {
     use blox_assets::types::{Action, AssetPath, Bindings, RoutePathPart};
     use hyper::{Method, Uri};
 
-    use crate::request_asset_path;
+    use super::request_asset_path;
 
     fn uri_with_path_and_query(path_and_query: &str) -> Uri {
         Uri::builder()
