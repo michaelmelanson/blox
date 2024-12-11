@@ -65,12 +65,16 @@ pub struct Function {
 
 impl std::fmt::Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "<function {}/{}>",
-            self.definition.name,
-            self.definition.parameters.len()
-        )
+        if let Some(name) = &self.definition.name {
+            write!(
+                f,
+                "<function {}/{}>",
+                name,
+                self.definition.parameters.len()
+            )
+        } else {
+            write!(f, "<lambda/{}>", self.definition.parameters.len())
+        }
     }
 }
 

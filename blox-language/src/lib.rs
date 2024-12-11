@@ -117,12 +117,12 @@ impl<'a> Parser<'a> {
         let name = self.parse_identifier(
             node.child_by_field_name("name")
                 .expect("definition has no name"),
-        );
+        )?;
 
         let body = self.parse_block(
             node.child_by_field_name("body")
                 .expect("definition has no body"),
-        );
+        )?;
 
         let mut parameters = vec![];
         for child in node.children_by_field_name("parameter", &mut node.walk()) {
@@ -130,9 +130,9 @@ impl<'a> Parser<'a> {
         }
 
         Ok(ast::Definition {
-            name: name.expect("expected name"),
+            name: Some(name),
             parameters,
-            body: body.expect("expected body"),
+            body,
         })
     }
 
@@ -197,57 +197,71 @@ impl<'a> Parser<'a> {
         Ok(expression)
     }
 
-    fn parse_expression(&self, node: Node<'_>) -> Result<ast::Expression, ParseError> {
-        match node.kind() {
-            "term" => Ok(Expression::Term(self.parse_expression_term(node)?)),
-            "binary_expression" => {
-                let (lhs, operator, rhs) = self.parse_binary_expression(node)?;
-                Ok(Expression::BinaryExpression(lhs, operator, rhs))
-            }
-            kind => unimplemented!("expression kind: {kind}"),
+    pub fn parse_lambda(&self, node: Node<'_>) -> Result<ast::Definition, ParseError> {
+        let mut parameters = vec![];
+        for child in node.children_by_field_name("parameter", &mut node.walk()) {
+            parameters.push(ast::Parameter(self.parse_identifier(child)?));
         }
+
+        let body = self.parse_block(
+            node.child_by_field_name("body")
+                .expect("lambda has no body"),
+        )?;
+
+        Ok(ast::Definition {
+            name: None,
+            parameters,
+            body,
+        })
     }
 
-    fn parse_expression_term(&self, node: Node<'_>) -> Result<ast::ExpressionTerm, ParseError> {
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            match child.kind() {
-                "if_expression" => {
-                    return Ok(ast::ExpressionTerm::If(self.parse_if_expression(child)?))
-                }
-                "array_index" => {
-                    return Ok(ast::ExpressionTerm::ArrayIndex(
-                        self.parse_array_index(child)?,
-                    ))
-                }
-                "object_index" => {
-                    return Ok(ast::ExpressionTerm::ObjectIndex(
-                        self.parse_object_index(child)?,
-                    ))
-                }
-                "function_call" => {
-                    return Ok(ast::ExpressionTerm::FunctionCall(
-                        self.parse_function_call(child)?,
-                    ))
-                }
-                "literal" => return Ok(ast::ExpressionTerm::Literal(self.parse_literal(child)?)),
-                "identifier" => {
-                    return Ok(ast::ExpressionTerm::Identifier(
-                        self.parse_identifier(child)?,
-                    ))
-                }
-                "array" => return Ok(ast::ExpressionTerm::Array(self.parse_array(child)?)),
-                "object" => return Ok(ast::ExpressionTerm::Object(self.parse_object(child)?)),
-                "group_term" => {
-                    return Ok(ast::ExpressionTerm::Expression(Box::new(
-                        self.parse_expression_container(child)?,
-                    )))
-                }
-                kind => unimplemented!("expression term kind: {kind}"),
+    fn parse_expression(&self, node: Node<'_>) -> Result<ast::Expression, ParseError> {
+        let result = match node.kind() {
+            "binary_expression" => {
+                let (lhs, operator, rhs) = self.parse_binary_expression(node)?;
+                Expression::BinaryExpression(lhs, operator, rhs)
             }
-        }
+            "if_expression" => {
+                Expression::Term(ast::ExpressionTerm::If(self.parse_if_expression(node)?))
+            }
+            "array_slice" => Expression::Term(ast::ExpressionTerm::ArraySlice(
+                self.parse_array_slice(node)?,
+            )),
+            "array_index" => Expression::Term(ast::ExpressionTerm::ArrayIndex(
+                self.parse_array_index(node)?,
+            )),
+            "object_index" => Expression::Term(ast::ExpressionTerm::ObjectIndex(
+                self.parse_object_index(node)?,
+            )),
+            "method_call" => Expression::Term(ast::ExpressionTerm::MethodCall(
+                self.parse_method_call(node)?,
+            )),
+            "function_call" => Expression::Term(ast::ExpressionTerm::FunctionCall(
+                self.parse_function_call(node)?,
+            )),
+            "literal" => Expression::Term(ast::ExpressionTerm::Literal(self.parse_literal(node)?)),
+            "identifier" => Expression::Term(ast::ExpressionTerm::Identifier(
+                self.parse_identifier(node)?,
+            )),
+            "array" => {
+                return Ok(Expression::Term(ast::ExpressionTerm::Array(
+                    self.parse_array(node)?,
+                )));
+            }
+            "object" => Expression::Term(ast::ExpressionTerm::Object(self.parse_object(node)?)),
+            "group_term" => Expression::Term(ast::ExpressionTerm::Expression(Box::new(
+                self.parse_expression_container(node)?,
+            ))),
+            "lambda" => Expression::Term(ast::ExpressionTerm::Lambda(self.parse_lambda(node)?)),
+            "group" => self.parse_expression(
+                node.child_by_field_name("expression")
+                    .expect("group without expression"),
+            )?,
 
-        unreachable!();
+            kind => unimplemented!("expression kind: {kind}"),
+        };
+
+        Ok(result)
     }
 
     fn parse_binary_expression(
@@ -298,7 +312,7 @@ impl<'a> Parser<'a> {
                     return Ok(ast::Literal::String(s));
                 }
                 "symbol" => {
-                    let value = self.value(child.range());
+                    let value = self.parse_symbol(child)?;
                     return Ok(ast::Literal::Symbol(value.to_string()));
                 }
                 _ => {}
@@ -322,6 +336,10 @@ impl<'a> Parser<'a> {
             "greater_than" => Ok(Operator::GreaterThan),
             "less_or_equal" => Ok(Operator::LessOrEqual),
             "less_than" => Ok(Operator::LessThan),
+
+            "assignment" => Ok(Operator::Assignment),
+            "append" => Ok(Operator::Append),
+            "pipe" => Ok(Operator::Pipe),
             kind => unimplemented!("operator kind: {kind}"),
         }
     }
@@ -335,10 +353,26 @@ impl<'a> Parser<'a> {
         Ok(s.to_string())
     }
 
-    fn parse_function_call(&self, node: Node<'_>) -> Result<ast::FunctionCall, ParseError> {
-        let identifier = self.parse_identifier(
-            node.child_by_field_name("name")
-                .expect("function call without name"),
+    fn parse_symbol(&self, node: Node<'_>) -> Result<String, ParseError> {
+        let s = self.value(node.range());
+
+        // strip off the colon off the start
+        let s = s.get(1..s.len()).expect("expected inner pair");
+
+        Ok(s.to_string())
+    }
+
+    fn parse_method_call(&self, node: Node<'_>) -> Result<ast::MethodCall, ParseError> {
+        let base = Box::new(
+            self.parse_expression(
+                node.child_by_field_name("base")
+                    .expect("method call without base"),
+            )?,
+        );
+
+        let function = self.parse_identifier(
+            node.child_by_field_name("function")
+                .expect("method call without function"),
         )?;
 
         let mut arguments = vec![];
@@ -346,7 +380,27 @@ impl<'a> Parser<'a> {
             arguments.push(self.parse_argument(child)?);
         }
 
-        Ok(ast::FunctionCall(identifier, arguments))
+        Ok(ast::MethodCall {
+            base,
+            function,
+            arguments,
+        })
+    }
+
+    fn parse_function_call(&self, node: Node<'_>) -> Result<ast::FunctionCall, ParseError> {
+        let function = Box::new(
+            self.parse_expression(
+                node.child_by_field_name("function")
+                    .expect("function call without callee"),
+            )?,
+        );
+
+        let mut arguments = vec![];
+        for child in node.children_by_field_name("argument", &mut node.walk()) {
+            arguments.push(self.parse_argument(child)?);
+        }
+
+        Ok(ast::FunctionCall(function, arguments))
     }
 
     fn parse_array(&self, node: Node<'_>) -> Result<ast::Array, ParseError> {
@@ -358,6 +412,30 @@ impl<'a> Parser<'a> {
         }
 
         Ok(ast::Array(members))
+    }
+
+    fn parse_array_slice(&self, node: Node<'_>) -> Result<ast::ArraySlice, ParseError> {
+        let base = Box::new(
+            self.parse_expression(
+                node.child_by_field_name("base")
+                    .expect("array slice with no base"),
+            )?,
+        );
+
+        let start_node = node.child_by_field_name("start");
+        let end_node = node.child_by_field_name("end");
+
+        let start = match start_node {
+            Some(node) => Some(Box::new(self.parse_expression(node)?)),
+            None => None,
+        };
+
+        let end = match end_node {
+            Some(node) => Some(Box::new(self.parse_expression(node)?)),
+            None => None,
+        };
+
+        Ok(ast::ArraySlice { base, start, end })
     }
 
     fn parse_array_index(&self, node: Node<'_>) -> Result<ast::ArrayIndex, ParseError> {
@@ -535,17 +613,15 @@ mod tests {
             ast::Program(ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::BinaryExpression(
-                    Box::new(ast::Expression::Term(ast::ExpressionTerm::Expression(
-                        Box::new(ast::Expression::BinaryExpression(
-                            Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                                ast::Literal::Number(1.into())
-                            ))),
-                            ast::Operator::Multiply,
-                            Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
-                                ast::Literal::Number(2.into())
-                            )))
-                        ))
-                    ))),
+                    Box::new(ast::Expression::BinaryExpression(
+                        Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                            ast::Literal::Number(1.into())
+                        ))),
+                        ast::Operator::Multiply,
+                        Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
+                            ast::Literal::Number(2.into())
+                        )))
+                    )),
                     ast::Operator::Add,
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
                         ast::Literal::Number(3.into())
@@ -563,7 +639,7 @@ mod tests {
             ast::Program(ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Symbol(
-                    ":symbol".to_string()
+                    "symbol".to_string()
                 )))
             )])),
             actual

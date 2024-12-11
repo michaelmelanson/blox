@@ -1,0 +1,27 @@
+
+def join(list, with) {
+    let len = list.length();
+    if len == 0 {
+        ""
+    } else if len == 1 {
+        list[0]
+    } else {
+        list[0] ++ with ++ list[1..].join(with: with);
+    }
+}
+
+def length(list) {
+    if list == [] {
+        0
+    } else {
+        1 + length(list: list[1..])
+    }
+}
+
+def map(list, fn) {
+    if list == [] {
+        []
+    } else {
+        [fn(value: list[0])] ++ map(list: list[1..], fn: fn)
+    }
+}

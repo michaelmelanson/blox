@@ -29,7 +29,9 @@ pub fn execute_statement(
                 closure: closure.clone(),
             });
 
-            scope.insert_binding(&definition.name, function.clone());
+            if let Some(name) = &definition.name {
+                scope.insert_binding(name, function.clone());
+            }
 
             Ok(function)
         }

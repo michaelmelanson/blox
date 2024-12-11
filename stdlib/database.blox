@@ -1,0 +1,89 @@
+import { join, map } from "stdlib/list";
+
+def table(name) {
+    {
+        operation: :table,
+        table: name,
+    }
+}
+
+def select(query, column) {
+    if query.operation == :select {
+        query.columns << column
+        query
+    } else if query.operation == :table {
+        {
+            operation: :select,
+            table: query,
+            columns: [column],
+            where: [],
+        }
+    } else {
+        :error
+    }
+}
+
+def where(query, condition) {
+    if query.operation == :select {
+        query.where << condition
+        query
+    } else {
+        :error
+    }
+}
+
+
+def column(table, name) {
+    { operation: :column, table: table, column: name }
+}
+
+def eq(column, value) {
+    { operation: :operator, column: column, operator: :eq, value: value }
+}
+
+def operator_to_sql(operator) {
+    if operator == :eq {
+        '='
+    } else {
+        :error
+    }
+}
+
+def to_sql(query) {
+    if query.operation == :table {
+        query.table
+    } else if query.operation == :column {
+        query.table.to_sql() ++ '.' ++ query.column
+    } else if query.operation == :select {
+        let select = if query.columns == [] {
+            '*'
+        } else {
+            query.columns
+                .map(fn: |value| { value.to_sql() })
+                .join(with: ', ')
+        };
+
+        let parts = [
+            'SELECT', select,
+            'FROM', query.table.to_sql(),
+        ];
+
+        if query.where != [] {
+            let where = query.where
+                .map(fn: |value| {
+                    [
+                        value.column.to_sql(),
+                        operator_to_sql(operator: value.operator),
+                        value.value
+                    ].join(with: ' ')
+                })
+                .join(with: ' AND ');
+
+            parts << 'WHERE ' ++ where;
+        };
+
+        parts.join(with: ' ')
+    } else {
+        :unknown_operation
+    }
+}

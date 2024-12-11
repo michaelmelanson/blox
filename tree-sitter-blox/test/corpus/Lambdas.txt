@@ -2,33 +2,76 @@
 Lambda (no parameters)
 ====================
 
-|| 1 + a
+|| { 1 + a }
 
 ---
 
 (source_file
   statement: (expression_statement
-    expression: (term
-      (lambda
-        body: (binary_expression
-          lhs: (term (literal (number)))
-          operator: (add)
-          rhs: (term (identifier)))))))
+    expression: (lambda
+        body: (block
+          statement: (expression_statement
+            expression: (binary_expression
+              lhs: (literal (number))
+              operator: (add)
+              rhs: (identifier)))))))
 
 ====================
 Lambda (one parameter)
 ====================
 
-|x| 1 + x
+|x| { 1 + x }
 
 ---
 
 (source_file
   statement: (expression_statement
-    expression: (term
-      (lambda
+    expression: (lambda
         parameter: (identifier)
-        body: (binary_expression
-          lhs: (term (literal (number)))
-          operator: (add)
-          rhs: (term (identifier)))))))
+        body: (block
+          statement: (expression_statement
+            expression: (binary_expression
+              lhs: (literal (number))
+              operator: (add)
+              rhs: (identifier)))))))
+
+====================
+Lambda with method call
+====================
+
+|x| { x.foo() }
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (lambda
+        parameter: (identifier)
+        body: (block
+          statement: (expression_statement
+            expression: (method_call
+                base: (identifier)
+                function: (identifier)))))))
+
+====================
+Calling lambda inline
+====================
+
+|x| { x + 1 }(x: 2)
+
+---
+
+(source_file
+  statement: (expression_statement
+    expression: (function_call
+      function: (lambda
+        parameter: (identifier)
+          body: (block
+          statement: (expression_statement
+            expression: (binary_expression
+            lhs: (identifier)
+            operator: (add)
+            rhs: (literal (number))))))
+        argument: (argument
+          name: (identifier)
+          value: (literal (number))))))

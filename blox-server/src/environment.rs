@@ -35,8 +35,14 @@ impl BloxEnvironment {
     }
 }
 
-const STDLIB: [(&'static str, &'static str); 1] =
-    [("stdlib/math.blox", include_str!("../../stdlib/math.blox"))];
+const STDLIB: [(&'static str, &'static str); 3] = [
+    ("stdlib/math.blox", include_str!("../../stdlib/math.blox")),
+    ("stdlib/list.blox", include_str!("../../stdlib/list.blox")),
+    (
+        "stdlib/database.blox",
+        include_str!("../../stdlib/database.blox"),
+    ),
+];
 
 pub(crate) fn create_scope(assets: Arc<Mutex<AssetManager>>) -> Scope {
     let scope = Scope::default();

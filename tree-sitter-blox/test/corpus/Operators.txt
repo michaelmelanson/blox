@@ -9,9 +9,9 @@ Addition
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (add)
-      rhs: (term (identifier)))))
+      rhs: (identifier))))
 
 ===============
 Subtraction
@@ -24,9 +24,9 @@ Subtraction
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (subtract)
-      rhs: (term (identifier)))))
+      rhs: (identifier))))
 
 ===============
 Multiplication
@@ -39,9 +39,9 @@ Multiplication
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (multiply)
-      rhs: (term (identifier)))))
+      rhs: (identifier))))
 
 ===============
 Division
@@ -54,9 +54,9 @@ Division
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (divide)
-      rhs: (term (identifier)))))
+      rhs: (identifier))))
 
 ===============
 Concatenate
@@ -69,9 +69,9 @@ Concatenate
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (string)))
+      lhs: (literal (string))
       operator: (concatenate)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Equal
@@ -84,9 +84,9 @@ Equal
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (equal)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Not equal
@@ -99,9 +99,9 @@ Not equal
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (not_equal)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Less than
@@ -114,9 +114,9 @@ Less than
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (less_than)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Less than or equal
@@ -129,9 +129,9 @@ Less than or equal
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (less_or_equal)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Greater than
@@ -144,9 +144,9 @@ Greater than
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (greater_than)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 =================
 Greater than or equal
@@ -159,9 +159,9 @@ Greater than or equal
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (literal (number)))
+      lhs: (literal (number))
       operator: (greater_or_equal)
-      rhs: (term (literal (string))))))
+      rhs: (literal (string)))))
 
 ===============
 Assignment (simple)
@@ -174,9 +174,9 @@ x = 1
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (identifier))
+      lhs: (identifier)
       operator: (assignment)
-      rhs: (term (literal (number))))))
+      rhs: (literal (number)))))
 
 ======================
 Assignment (object property)
@@ -189,11 +189,11 @@ foo.bar = 55
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (object_index
-        base: (term (identifier))
-        index: (identifier)))
+      lhs: (object_index
+        base: (identifier)
+        index: (identifier))
       operator: (assignment)
-      rhs: (term (literal (number))))))
+      rhs: (literal (number)))))
 
 ======================
 Append to array
@@ -206,6 +206,6 @@ array << value
 (source_file
   statement: (expression_statement
     expression: (binary_expression
-      lhs: (term (identifier))
+      lhs: (identifier)
       operator: (append)
-      rhs: (term (identifier)))))
+      rhs: (identifier))))

@@ -31,11 +31,11 @@ def circle_area(r) {
       statement: (expression_statement
         expression: (binary_expression
           lhs: (binary_expression
-            lhs: (term (identifier))
+            lhs: (identifier)
             operator: (multiply)
-            rhs: (term (identifier)))
+            rhs: (identifier))
           operator: (multiply)
-          rhs: (term (identifier)))))))
+          rhs: (identifier))))))
 
 
 =================
@@ -56,6 +56,6 @@ def rectangle_area(l, w) {
     body: (block
       statement: (expression_statement
        expression: (binary_expression
-          lhs: (term (identifier))
+          lhs: (identifier)
           operator: (multiply)
-          rhs: (term (identifier)))))))
+          rhs: (identifier))))))

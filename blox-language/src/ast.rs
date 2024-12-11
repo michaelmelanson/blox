@@ -3,6 +3,12 @@ use rust_decimal::Decimal;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(pub Block);
 
+impl std::fmt::Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Identifier(pub String);
 
@@ -17,13 +23,17 @@ pub struct Block(pub Vec<Statement>);
 
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{")?;
+        write!(f, "{{ ")?;
 
-        for statement in &self.0 {
-            writeln!(f, "{}", statement)?;
+        for (index, statement) in self.0.iter().enumerate() {
+            write!(f, "{}", statement)?;
+
+            if index < self.0.len() - 1 {
+                writeln!(f, ";")?;
+            }
         }
 
-        write!(f, "}}")
+        write!(f, " }}")
     }
 }
 
@@ -48,14 +58,18 @@ impl std::fmt::Display for Statement {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Definition {
-    pub name: Identifier,
+    pub name: Option<Identifier>,
     pub parameters: Vec<Parameter>,
     pub body: Block,
 }
 
 impl std::fmt::Display for Definition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "def {}(", self.name)?;
+        if let Some(name) = &self.name {
+            write!(f, "def {}(", name)?;
+        } else {
+            write!(f, "|")?;
+        }
 
         for (i, param) in self.parameters.iter().enumerate() {
             if i > 0 {
@@ -65,7 +79,11 @@ impl std::fmt::Display for Definition {
             write!(f, "{}", param)?;
         }
 
-        write!(f, ") {}", self.body)
+        if self.name.is_none() {
+            write!(f, "| {}", self.body)
+        } else {
+            write!(f, ") {}", self.body)
+        }
     }
 }
 
@@ -129,30 +147,57 @@ impl std::fmt::Display for Expression {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExpressionTerm {
+    Expression(Box<Expression>),
     If(If),
+    ArraySlice(ArraySlice),
     ArrayIndex(ArrayIndex),
     ObjectIndex(ObjectIndex),
+    MethodCall(MethodCall),
     FunctionCall(FunctionCall),
     Identifier(Identifier),
     Literal(Literal),
     Array(Array),
     Object(Object),
-    Expression(Box<Expression>),
+    Lambda(Definition),
 }
 
 impl std::fmt::Display for ExpressionTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ExpressionTerm::Expression(v) => write!(f, "{v}"),
+            ExpressionTerm::MethodCall(v) => write!(f, "{v}"),
             ExpressionTerm::FunctionCall(v) => write!(f, "{v}"),
             ExpressionTerm::Identifier(v) => write!(f, "{v}"),
             ExpressionTerm::Literal(v) => write!(f, "{v}"),
-            ExpressionTerm::Expression(v) => write!(f, "{v}"),
             ExpressionTerm::Array(v) => write!(f, "{v}"),
+            ExpressionTerm::ArraySlice(v) => write!(f, "{v}"),
             ExpressionTerm::ArrayIndex(v) => write!(f, "{v}"),
             ExpressionTerm::Object(v) => write!(f, "{v}"),
             ExpressionTerm::ObjectIndex(v) => write!(f, "{v}"),
             ExpressionTerm::If(v) => write!(f, "{v}"),
+            ExpressionTerm::Lambda(v) => write!(f, "{v}"),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArraySlice {
+    pub base: Box<Expression>,
+    pub start: Option<Box<Expression>>,
+    pub end: Option<Box<Expression>>,
+}
+
+impl std::fmt::Display for ArraySlice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}[", self.base)?;
+        if let Some(start) = &self.start {
+            write!(f, "{start}")?;
+        }
+        write!(f, "..")?;
+        if let Some(end) = &self.end {
+            write!(f, "{end}")?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -252,6 +297,10 @@ pub enum Operator {
     GreaterThan,
     LessOrEqual,
     LessThan,
+
+    Assignment,
+    Append,
+    Pipe,
 }
 
 impl std::fmt::Display for Operator {
@@ -270,6 +319,9 @@ impl std::fmt::Display for Operator {
             Operator::GreaterThan => write!(f, ">"),
             Operator::LessOrEqual => write!(f, "<="),
             Operator::LessThan => write!(f, "<"),
+            Operator::Assignment => write!(f, "="),
+            Operator::Append => write!(f, "<<"),
+            Operator::Pipe => write!(f, "|>"),
         }
     }
 }
@@ -279,12 +331,33 @@ pub struct Argument(pub Identifier, pub Expression);
 
 impl std::fmt::Display for Argument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.0, self.1)
+        write!(f, "{}: {}", self.0, self.1)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FunctionCall(pub Identifier, pub Vec<Argument>);
+pub struct MethodCall {
+    pub base: Box<Expression>,
+    pub function: Identifier,
+    pub arguments: Vec<Argument>,
+}
+impl std::fmt::Display for MethodCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}(", self.base, self.function)?;
+        let arg_count = self.arguments.len();
+        for (index, argument) in self.arguments.iter().enumerate() {
+            if index != arg_count - 1 {
+                write!(f, "{}, ", argument)?;
+            } else {
+                write!(f, "{}", argument)?;
+            }
+        }
+        write!(f, ")")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FunctionCall(pub Box<Expression>, pub Vec<Argument>);
 
 impl std::fmt::Display for FunctionCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -311,14 +384,14 @@ pub struct If {
 
 impl std::fmt::Display for If {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if {} {{ {} }}", self.condition, self.body)?;
+        write!(f, "if {} {}", self.condition, self.body)?;
 
         for (condition, branch) in &self.elseif_branches {
-            write!(f, "else if {} {{ {} }}", condition, branch)?;
+            write!(f, " else if {} {}", condition, branch)?;
         }
 
         if let Some(branch) = &self.else_branch {
-            write!(f, "else {{ {} }}", branch)?;
+            write!(f, " else {}", branch)?;
         }
 
         Ok(())

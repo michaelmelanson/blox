@@ -43,11 +43,7 @@
 
 (lambda
   parameter:(identifier) @parameter
-  body:[
-    (term)
-    (unary_expression)
-    (binary_expression)
-  ] @function.body
+  body: (block)@function.body
 )
 
-(function_call name:(identifier) @function.call)
+(function_call function:(identifier) @function.call)

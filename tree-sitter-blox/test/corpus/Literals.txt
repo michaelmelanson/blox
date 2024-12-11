@@ -8,9 +8,7 @@ Numbers
 
 (source_file
   (expression_statement
-    (term (literal (number)))))
-
-
+    (literal (number))))
 
 ========
 Strings
@@ -22,7 +20,7 @@ Strings
 
 (source_file
   (expression_statement
-    (term (literal (string)))))
+    (literal (string))))
 
 ============
 Object literals
@@ -33,10 +31,10 @@ Object literals
 ---
 
 (source_file
-  (expression_statement
-    (term (object
-      (object_member (identifier) (term (literal (number))))
-      (object_member (identifier) (term (literal (string))))))))
+  statement: (expression_statement
+    expression: (object
+      member: (object_member key: (identifier) value: (literal (number)))
+      member: (object_member key: (identifier) value: (literal (string))))))
 
 ===========================
 Object literal with trailing comma
@@ -47,7 +45,19 @@ Object literal with trailing comma
 ---
 
 (source_file
+  statement: (expression_statement
+    expression: (object
+      member: (object_member key: (identifier) value: (literal (number)))
+      member: (object_member key: (identifier) value: (literal (string))))))
+
+===========================
+Symbol literals
+===========================
+
+:foo_bar_baz
+
+---
+
+(source_file
   (expression_statement
-    (term (object
-      (object_member (identifier) (term (literal (number))))
-      (object_member (identifier) (term (literal (string))))))))
+    (literal (symbol))))

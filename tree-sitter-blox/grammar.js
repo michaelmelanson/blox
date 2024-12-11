@@ -11,10 +11,12 @@ module.exports = grammar({
   name: "blox",
 
   rules: {
-    source_file: ($) => repeat(field("statement", $._statement)),
+    source_file: ($) => optional($._statement_list),
     comment: ($) => choice(token(seq("#", /.*/))),
 
-    block: ($) => seq("{", repeat(field("statement", $._statement)), "}"),
+    block: ($) => seq("{", optional($._statement_list), "}"),
+    _statement_list: ($) =>
+      repeat1(seq(field("statement", $._statement), optional(";"))),
     _statement: ($) =>
       choice($.definition, $.binding, $.import, $.expression_statement),
     binding: ($) =>
@@ -54,38 +56,44 @@ module.exports = grammar({
         optional(seq("as", field("alias", $.identifier))),
       ),
     expression_statement: ($) => field("expression", $._expression),
-    _expression: ($) => choice($.term, $.unary_expression, $.binary_expression),
-    term: ($) =>
+    _expression: ($) =>
+      choice($.group, $._term, $.unary_expression, $.binary_expression),
+    _term: ($) =>
       choice(
         $.if_expression,
+        $.array_slice,
         $.array_index,
         $.object_index,
+        $.method_call,
         $.function_call,
         $.lambda,
         $._value,
-        $.group_term,
       ),
-    group_term: ($) => seq("(", field("expression", $._expression), ")"),
+    group: ($) => seq("(", field("expression", $._expression), ")"),
     unary_expression: ($) =>
       prec.left(
         1,
-        choice(prec(3, seq($.negate, $.term)), prec(3, seq($.not, $.term))),
+        choice(
+          prec(3, seq($.negate, $._expression)),
+          prec(3, seq($.not, $._expression)),
+        ),
       ),
     binary_expression: ($) => {
       let operators = [
+        { operator: $.multiply, precedence: 4 },
+        { operator: $.divide, precedence: 4 },
+
+        { operator: $.concatenate, precedence: 3 },
+        { operator: $.add, precedence: 3 },
+        { operator: $.subtract, precedence: 3 },
         { operator: $.multiply, precedence: 3 },
         { operator: $.divide, precedence: 3 },
-        { operator: $.concatenate, precedence: 2 },
-        { operator: $.add, precedence: 2 },
-        { operator: $.subtract, precedence: 2 },
-        { operator: $.multiply, precedence: 2 },
-        { operator: $.divide, precedence: 2 },
-        { operator: $.equal, precedence: 2 },
-        { operator: $.not_equal, precedence: 2 },
-        { operator: $.less_than, precedence: 2 },
-        { operator: $.less_or_equal, precedence: 2 },
-        { operator: $.greater_than, precedence: 2 },
-        { operator: $.greater_or_equal, precedence: 2 },
+        { operator: $.equal, precedence: 3 },
+        { operator: $.not_equal, precedence: 3 },
+        { operator: $.less_than, precedence: 3 },
+        { operator: $.less_or_equal, precedence: 3 },
+        { operator: $.greater_than, precedence: 3 },
+        { operator: $.greater_or_equal, precedence: 3 },
 
         { operator: $.assignment, precedence: 1 },
         { operator: $.append, precedence: 1 },
@@ -123,10 +131,27 @@ module.exports = grammar({
         field("body", $.block),
       ),
     else_expression: ($) => seq("else", field("body", $.block)),
+    method_call: ($) =>
+      prec(
+        5,
+        seq(
+          field("base", $._expression),
+          ".",
+          field("function", $.identifier),
+          "(",
+          optional($._argument_list),
+          ")",
+        ),
+      ),
     function_call: ($) =>
       prec(
-        1,
-        seq(field("name", $.identifier), "(", optional($._argument_list), ")"),
+        4,
+        seq(
+          field("function", $._expression),
+          "(",
+          optional($._argument_list),
+          ")",
+        ),
       ),
     _argument_list: ($) =>
       seq(
@@ -142,9 +167,21 @@ module.exports = grammar({
         field("member", $._expression),
         repeat(seq(",", field("member", $._expression))),
       ),
-    array_index: ($) =>
+    array_slice: ($) =>
       prec(
         3,
+        seq(
+          field("base", $._expression),
+          "[",
+          optional(field("start", $._expression)),
+          "..",
+          optional(field("end", $._expression)),
+          "]",
+        ),
+      ),
+    array_index: ($) =>
+      prec(
+        4,
         seq(
           field("base", $._expression),
           "[",
@@ -167,7 +204,7 @@ module.exports = grammar({
         4,
         seq(field("base", $._expression), ".", field("index", $.identifier)),
       ),
-    lambda: ($) => seq($._lambda_parameters, field("body", $._expression)),
+    lambda: ($) => prec(6, seq($._lambda_parameters, field("body", $.block))),
     _lambda_parameters: ($) =>
       seq(
         "|",
@@ -209,7 +246,7 @@ module.exports = grammar({
         seq('"', repeat(choice(/[^"]/, '\\"')), '"'),
         seq("'", repeat(choice(/[^']/, "\\'")), "'"),
       ),
-    symbol: ($) => seq(":", /[a-zA-Z]+/),
+    symbol: ($) => seq(":", /[a-zA-Z_]+/),
   },
 
   extras: ($) => [/\s/, $.comment],

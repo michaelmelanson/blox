@@ -29,8 +29,16 @@ pub enum RuntimeError {
         index_expression: ast::Expression,
         index_value: Value,
     },
+    NotAnArray {
+        expression: ast::Expression,
+        value: Value,
+    },
     NotAFunction {
-        identifier: ast::Identifier,
+        callee: ast::Expression,
+        value: Value,
+    },
+    NotANumber {
+        expression: ast::Expression,
         value: Value,
     },
     NotAnObject {
@@ -46,6 +54,13 @@ pub enum RuntimeError {
     ModuleNotFound(String),
     ExportNotFound(Module, ast::Identifier),
     DecimalConversionError(rust_decimal::Error),
+    MethodCallWithoutSelf {
+        method: ast::Identifier,
+    },
+    LhsNotAssignable {
+        expression: ast::Expression,
+        value: Value,
+    },
 }
 
 impl std::error::Error for RuntimeError {}
@@ -82,8 +97,8 @@ impl std::fmt::Display for RuntimeError {
                     "invalid condition: {condition_expression} (={condition_value})"
                 )
             }
-            RuntimeError::NotAFunction { identifier, value } => {
-                write!(f, "{identifier} is not a function: {value}")
+            RuntimeError::NotAFunction { callee, value } => {
+                write!(f, "{callee} is not a function: {value}")
             }
             RuntimeError::InvalidArrayIndex {
                 array_expression,
@@ -100,6 +115,12 @@ impl std::fmt::Display for RuntimeError {
                 index_value,
             } => {
                 write!(f, "array index out of bounds: {array_expression} (={array_value})[{index_expression} (={index_value})]")
+            }
+            RuntimeError::NotAnArray { expression, value } => {
+                write!(f, "{expression} (={value}) is not an array")
+            }
+            RuntimeError::NotANumber { expression, value } => {
+                write!(f, "{expression} (={value}) is not a number")
             }
             RuntimeError::NotAnObject {
                 object_expression,
@@ -129,6 +150,12 @@ impl std::fmt::Display for RuntimeError {
             }
             RuntimeError::DecimalConversionError(error) => {
                 write!(f, "decimal conversion error: {error}")
+            }
+            RuntimeError::MethodCallWithoutSelf { method } => {
+                write!(f, "method calls must refer to a function with at least one argument, but {method} takes no arguments")
+            }
+            RuntimeError::LhsNotAssignable { expression, value } => {
+                write!(f, "cannot assign to {expression} (={value})")
             }
         }
     }
