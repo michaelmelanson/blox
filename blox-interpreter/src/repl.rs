@@ -28,7 +28,7 @@ impl std::error::Error for BloxReplError {}
 
 pub fn start_repl(mut scope: Arc<Scope>) -> Result<(), BloxReplError> {
     let mut editor = rustyline::DefaultEditor::new()?;
-    editor.load_history(".blox-history")?;
+    let _ = editor.load_history(".blox-history");
 
     'repl: loop {
         let line = editor.readline("blox> ");
