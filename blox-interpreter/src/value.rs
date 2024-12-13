@@ -22,14 +22,23 @@ pub enum Value {
     Intrinsic(Intrinsic),
 }
 
+impl Value {
+    pub fn to_display_string(&self) -> String {
+        match self {
+            Value::String(v) => v.clone(),
+            _ => self.to_string(),
+        }
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Void => write!(f, "(void)"),
             Value::Boolean(bool) => write!(f, "{bool}"),
             Value::Number(number) => write!(f, "{number}"),
-            Value::String(string) => write!(f, "'{string}'",),
-            Value::Symbol(symbol) => write!(f, ":{symbol}",),
+            Value::String(string) => write!(f, "{string}"),
+            Value::Symbol(symbol) => write!(f, ":{symbol}"),
             Value::Function(function) => write!(f, "{function}"),
             Value::Array(values) => {
                 write!(f, "[")?;
