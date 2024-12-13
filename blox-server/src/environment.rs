@@ -44,7 +44,7 @@ const STDLIB: [(&'static str, &'static str); 3] = [
     ),
 ];
 
-pub(crate) fn create_scope(assets: Arc<Mutex<AssetManager>>) -> Scope {
+pub(crate) fn create_scope(_assets: Arc<Mutex<AssetManager>>) -> Scope {
     let scope = Scope::default();
 
     // load the standard library

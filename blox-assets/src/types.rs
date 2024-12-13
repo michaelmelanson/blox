@@ -81,4 +81,4 @@ impl IntoIterator for Bindings {
     }
 }
 
-pub struct Content(String);
+// pub struct Content();
