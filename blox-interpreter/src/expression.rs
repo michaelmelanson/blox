@@ -1,24 +1,24 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use blox_language::ast::{self, Argument, ArrayIndex, If, Object, ObjectIndex};
 use rust_decimal::Decimal;
 use tracing::trace;
 
-use crate::{program::evaluate_block, value::Function, Intrinsic, RuntimeError, Scope, Value};
+use crate::{
+    module::EvaluationContext, program::evaluate_block, value::Function, Intrinsic, RuntimeError,
+    Value,
+};
 
-#[tracing::instrument(level = "trace", skip(scope), ret)]
+#[tracing::instrument(level = "trace", skip(context), ret)]
 pub fn evaluate_expression(
     expression: &ast::Expression,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
     match expression {
-        ast::Expression::Term(term) => evaluate_expression_term(term, scope),
+        ast::Expression::Term(term) => evaluate_expression_term(term, context),
         ast::Expression::BinaryExpression(lhs, operator, rhs) => {
-            let lhs_value = evaluate_expression(lhs, scope)?;
-            let rhs_value = evaluate_expression(rhs, scope)?;
+            let lhs_value = evaluate_expression(lhs, context)?;
+            let rhs_value = evaluate_expression(rhs, context)?;
 
             let result = match (&lhs_value, operator, &rhs_value) {
                 (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
@@ -111,7 +111,7 @@ pub fn evaluate_expression(
             // if operator is a mutating operator, update the lhs value in the scope
             match operator {
                 ast::Operator::Append => {
-                    assign_to_expression(lhs, result.clone(), scope)?;
+                    assign_to_expression(lhs, result.clone(), context)?;
                 }
 
                 _ => {}
@@ -127,16 +127,16 @@ pub fn evaluate_expression(
 pub fn assign_to_expression(
     target: &ast::Expression,
     value: Value,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<(), RuntimeError> {
     match target {
         ast::Expression::Term(ast::ExpressionTerm::Identifier(identifier)) => {
-            scope.insert_binding(&identifier, value);
+            context.scope.insert_binding(&identifier, value);
             Ok(())
         }
         ast::Expression::Term(ast::ExpressionTerm::ArrayIndex(ArrayIndex { base, index })) => {
-            let base_value = evaluate_expression(&base, scope)?;
-            let index_value = evaluate_expression(&index, scope)?;
+            let base_value = evaluate_expression(&base, context)?;
+            let index_value = evaluate_expression(&index, context)?;
 
             match (&base_value, &index_value) {
                 (Value::Array(ref members), Value::Number(idx)) => {
@@ -152,7 +152,7 @@ pub fn assign_to_expression(
                     if idx < members.len() {
                         let mut members = members.clone();
                         members[idx] = value;
-                        assign_to_expression(&base, Value::Array(members), scope)
+                        assign_to_expression(&base, Value::Array(members), context)
                     } else {
                         Err(RuntimeError::ArrayIndexOutOfBounds {
                             array_expression: *base.clone(),
@@ -171,12 +171,12 @@ pub fn assign_to_expression(
             }
         }
         ast::Expression::Term(ast::ExpressionTerm::ObjectIndex(ObjectIndex { base, index })) => {
-            let base_value = evaluate_expression(&base, scope)?;
+            let base_value = evaluate_expression(&base, context)?;
 
             match base_value {
                 Value::Object(mut members) => {
                     members.insert(index.0.clone(), value);
-                    assign_to_expression(&base, Value::Object(members), scope)
+                    assign_to_expression(&base, Value::Object(members), context)
                 }
                 base_value => Err(RuntimeError::NotAnObject {
                     object_expression: *base.clone(),
@@ -215,10 +215,10 @@ pub fn cast_to_number(value: Value, context: &ast::Expression) -> Result<Decimal
 
 pub fn evaluate_expression_term(
     term: &ast::ExpressionTerm,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
     let result = match term {
-        ast::ExpressionTerm::Identifier(identifier) => scope.get_binding(&identifier),
+        ast::ExpressionTerm::Identifier(identifier) => context.scope.get_binding(&identifier),
         ast::ExpressionTerm::Literal(ast::Literal::Boolean(value)) => Ok(Value::Boolean(*value)),
         ast::ExpressionTerm::Literal(ast::Literal::Number(number)) => Ok(Value::Number(*number)),
         ast::ExpressionTerm::Literal(ast::Literal::String(string)) => {
@@ -227,29 +227,29 @@ pub fn evaluate_expression_term(
         ast::ExpressionTerm::Literal(ast::Literal::Symbol(string)) => {
             Ok(Value::Symbol(string.clone()))
         }
-        ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, scope),
-        ast::ExpressionTerm::MethodCall(method_call) => evaluate_method_call(method_call, scope),
+        ast::ExpressionTerm::Expression(expression) => evaluate_expression(expression, context),
+        ast::ExpressionTerm::MethodCall(method_call) => evaluate_method_call(method_call, context),
         ast::ExpressionTerm::FunctionCall(function_call) => {
-            evaluate_function_call(function_call, scope)
+            evaluate_function_call(function_call, context)
         }
         ast::ExpressionTerm::Array(array) => {
             let mut members = Vec::new();
             for member_expression in array.0.iter() {
-                let value = evaluate_expression(member_expression, scope)?;
+                let value = evaluate_expression(member_expression, context)?;
                 members.push(value);
             }
             Ok(Value::Array(members))
         }
         ast::ExpressionTerm::ArraySlice(ast::ArraySlice { base, start, end }) => {
-            let base_value: Vec<Value> = cast_to_array(evaluate_expression(base, scope)?, base)?;
+            let base_value: Vec<Value> = cast_to_array(evaluate_expression(base, context)?, base)?;
             let start_value: Decimal = if let Some(start) = start {
-                cast_to_number(evaluate_expression(start, scope)?, start)?
+                cast_to_number(evaluate_expression(start, context)?, start)?
             } else {
                 0.into()
             };
 
             let end_value: Option<Decimal> = if let Some(end) = end {
-                Some(cast_to_number(evaluate_expression(end, scope)?, end)?)
+                Some(cast_to_number(evaluate_expression(end, context)?, end)?)
             } else {
                 None
             };
@@ -270,8 +270,8 @@ pub fn evaluate_expression_term(
             Ok(Value::Array(result))
         }
         ast::ExpressionTerm::ArrayIndex(ArrayIndex { base, index }) => {
-            let array_value = evaluate_expression(base, scope)?;
-            let index_value = evaluate_expression(index, scope)?;
+            let array_value = evaluate_expression(base, context)?;
+            let index_value = evaluate_expression(index, context)?;
 
             match (&array_value, &index_value) {
                 (Value::Array(ref members), Value::Number(idx)) => {
@@ -306,13 +306,13 @@ pub fn evaluate_expression_term(
         ast::ExpressionTerm::Object(Object(members)) => {
             let mut object = BTreeMap::new();
             for (key, value_expression) in members.iter() {
-                let value = evaluate_expression(value_expression, scope)?;
+                let value = evaluate_expression(value_expression, context)?;
                 object.insert(key.clone(), value);
             }
             Ok(Value::Object(object))
         }
         ast::ExpressionTerm::ObjectIndex(ObjectIndex { base, index }) => {
-            let object_value = evaluate_expression(base, scope)?;
+            let object_value = evaluate_expression(base, context)?;
 
             match object_value {
                 Value::Object(ref members) => {
@@ -339,25 +339,25 @@ pub fn evaluate_expression_term(
             elseif_branches,
             else_branch,
         }) => {
-            if evaluate_condition(condition, scope)? {
-                return evaluate_block(body, scope);
+            if evaluate_condition(condition, context)? {
+                return evaluate_block(body, context);
             }
 
             for elseif_branch in elseif_branches {
-                if evaluate_condition(&elseif_branch.0, scope)? {
-                    return evaluate_block(&elseif_branch.1, scope);
+                if evaluate_condition(&elseif_branch.0, context)? {
+                    return evaluate_block(&elseif_branch.1, context);
                 }
             }
 
             if let Some(else_branch) = else_branch {
-                return evaluate_block(else_branch, scope);
+                return evaluate_block(else_branch, context);
             }
 
             Ok(Value::Void)
         }
         ast::ExpressionTerm::Lambda(definition) => Ok(Value::Function(Function {
             definition: definition.clone(),
-            closure: scope.clone(),
+            closure: context.scope.clone(),
         })),
     }?;
 
@@ -368,9 +368,9 @@ pub fn evaluate_expression_term(
 
 fn evaluate_condition(
     expression: &ast::Expression,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<bool, RuntimeError> {
-    let condition_value = evaluate_expression(expression, scope)?;
+    let condition_value = evaluate_expression(expression, context)?;
 
     let is_truthy = match condition_value {
         Value::Boolean(value) => value,
@@ -388,9 +388,9 @@ fn evaluate_condition(
 
 pub fn evaluate_method_call(
     method_call: &ast::MethodCall,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
-    let function = scope.get_binding(&method_call.function)?;
+    let function = context.scope.get_binding(&method_call.function)?;
 
     let Value::Function(function) = function else {
         return Err(RuntimeError::NotAFunction {
@@ -419,29 +419,30 @@ pub fn evaluate_method_call(
         arguments,
     );
 
-    evaluate_function_call(&function_call, scope)
+    evaluate_function_call(&function_call, context)
 }
 
 pub fn evaluate_function_call(
     function_call: &ast::FunctionCall,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
-    let function = evaluate_expression(&function_call.0, scope)?;
+    let function = evaluate_expression(&function_call.0, context)?;
 
     let result = match function {
         Value::Function(Function {
             definition,
             closure,
         }) => {
-            let mut call_scope = closure.child();
+            let mut call_context = context.child_with_scope(closure.child());
 
             for (parameter, argument) in definition.parameters.iter().zip(&function_call.1) {
                 let name = &parameter.0;
-                let value = evaluate_expression(&argument.1, scope)?;
+                let value = evaluate_expression(&argument.1, context)?;
 
-                call_scope.insert_binding(name, value);
+                call_context.scope.insert_binding(name, value);
             }
-            evaluate_block(&definition.body, &mut call_scope)
+
+            evaluate_block(&definition.body, &mut call_context)
         }
         Value::Intrinsic(Intrinsic {
             id: _,
@@ -451,7 +452,7 @@ pub fn evaluate_function_call(
             let mut parameters = HashMap::new();
 
             for Argument(name, rhs) in function_call.1.iter() {
-                let value = evaluate_expression(&rhs, scope)?;
+                let value = evaluate_expression(&rhs, context)?;
                 parameters.insert(name.clone(), value);
             }
 
@@ -470,14 +471,12 @@ pub fn evaluate_function_call(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use blox_language::{
         ast::{Expression, Identifier},
         ParseError,
     };
 
-    use crate::{Scope, Value};
+    use crate::{EvaluationContext, Value};
 
     use super::evaluate_expression;
 
@@ -490,10 +489,12 @@ mod tests {
     fn test_evaluate_addition_identifier_literal() {
         let expression = parse_expression("x + 1".to_string()).expect("parse error");
 
-        let mut scope = Arc::new(Scope::default());
-        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
+        let mut context = EvaluationContext::default();
+        context
+            .scope
+            .insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
 
-        let result = evaluate_expression(&expression, &mut scope);
+        let result = evaluate_expression(&expression, &mut context);
         assert_eq!(result, Ok(Value::Number(56.into())));
     }
 
@@ -501,11 +502,15 @@ mod tests {
     fn test_evaluate_addition_identifier_identifier() {
         let expression = parse_expression("x + y".to_string()).expect("parse error");
 
-        let mut scope = Arc::new(Scope::default());
-        scope.insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
-        scope.insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
+        let mut context = EvaluationContext::default();
+        context
+            .scope
+            .insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
+        context
+            .scope
+            .insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
 
-        let result = evaluate_expression(&expression, &mut scope);
+        let result = evaluate_expression(&expression, &mut context);
         assert_eq!(result, Ok(Value::Number(97.into())));
     }
 }

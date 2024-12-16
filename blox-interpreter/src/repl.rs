@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use blox_language::Parser;
 use rustyline::error::ReadlineError;
 
-use crate::{execute_program, Scope};
+use crate::{execute_program, module::EvaluationContext};
 
 #[derive(Debug)]
 pub enum BloxReplError {
@@ -26,7 +24,7 @@ impl From<ReadlineError> for BloxReplError {
 
 impl std::error::Error for BloxReplError {}
 
-pub fn start_repl(mut scope: Arc<Scope>) -> Result<(), BloxReplError> {
+pub fn start_repl(mut context: EvaluationContext) -> Result<(), BloxReplError> {
     let mut editor = rustyline::DefaultEditor::new()?;
     let _ = editor.load_history(".blox-history");
 
@@ -41,7 +39,7 @@ pub fn start_repl(mut scope: Arc<Scope>) -> Result<(), BloxReplError> {
 
                 match parser.parse() {
                     Ok(ast) => {
-                        let value = execute_program(&ast, &mut scope);
+                        let value = execute_program(&ast, &mut context);
                         match value {
                             Ok(value) => println!("{}", value),
                             Err(e) => eprintln!("Error: {e}"),

@@ -1,22 +1,23 @@
-use std::sync::Arc;
-
 use blox_language::ast;
 
-use crate::{statement::execute_statement, RuntimeError, Scope, Value};
+use crate::{statement::execute_statement, EvaluationContext, RuntimeError, Value};
 
-#[tracing::instrument(level = "debug", skip(program, scope))]
+#[tracing::instrument(level = "debug", skip(program, context))]
 pub fn execute_program(
     program: &ast::Program,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
-    evaluate_block(&program.0, scope)
+    evaluate_block(&program.0, context)
 }
 
-pub fn evaluate_block(block: &ast::Block, scope: &mut Arc<Scope>) -> Result<Value, RuntimeError> {
+pub fn evaluate_block(
+    block: &ast::Block,
+    context: &mut EvaluationContext,
+) -> Result<Value, RuntimeError> {
     let mut value = Value::Void;
 
     for statement in &block.0 {
-        value = execute_statement(statement, scope)?;
+        value = execute_statement(statement, context)?;
     }
 
     Ok(value)
@@ -39,8 +40,8 @@ mod tests {
             Err(e) => panic!("Parsing error: {}", e),
         };
 
-        let mut scope = Arc::new(Scope::default());
-        let result = execute_program(&program, &mut scope);
+        let mut context = EvaluationContext::default();
+        let result = execute_program(&program, &mut context);
 
         match &result {
             Ok(value) => assert_eq!(

@@ -4,7 +4,7 @@ use std::{
 };
 
 use blox_assets::{types::AssetPath, AssetError, AssetManager};
-use blox_interpreter::{execute_program, Scope, Value};
+use blox_interpreter::{execute_program, EvaluationContext, Scope, Value};
 use blox_language::ast::Identifier;
 use http_body_util::Full;
 use hyper::{body::Bytes, server::conn::http1, service::service_fn, Request, Response};
@@ -69,17 +69,19 @@ pub async fn handle_request(
 
     let mut assets = assets.lock().unwrap();
 
-    let mut scope = Arc::new(Scope::default());
+    let scope = Arc::new(Scope::default());
     for (name, value) in bindings {
         scope.insert_binding(&Identifier(name.clone()), Value::String(value))
     }
+
+    let mut context = EvaluationContext::new(".".to_string(), &scope);
 
     debug!(?path, "Loading asset");
     match path {
         AssetPath::Route(ref _vec) => {
             match assets.load::<BloxProgram>(&path) {
                 Ok(program) => {
-                    execute_program(&program.into(), &mut scope)?;
+                    execute_program(&program.into(), &mut context)?;
                 }
 
                 Err(error) => {

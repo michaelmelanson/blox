@@ -1,28 +1,28 @@
-use std::sync::Arc;
-
 use blox_language::ast;
 
 use crate::{
-    expression::evaluate_expression, module::load_module, value::Function, RuntimeError, Scope,
-    Value,
+    expression::evaluate_expression,
+    module::{load_module, EvaluationContext},
+    value::Function,
+    RuntimeError, Value,
 };
 
 pub fn execute_statement(
     statement: &ast::Statement,
-    scope: &mut Arc<Scope>,
+    context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
     match statement {
         ast::Statement::Expression(expression) => {
-            let value = evaluate_expression(expression, scope)?;
+            let value = evaluate_expression(expression, context)?;
             Ok(value)
         }
         ast::Statement::Binding(lhs, rhs) => {
-            let value = evaluate_expression(rhs, scope)?;
-            scope.insert_binding(lhs, value.clone());
+            let value = evaluate_expression(rhs, context)?;
+            context.scope.insert_binding(lhs, value.clone());
             Ok(value)
         }
         ast::Statement::Definition(definition) => {
-            let closure = scope.child();
+            let closure = context.scope.child();
 
             let function = Value::Function(Function {
                 definition: definition.clone(),
@@ -30,13 +30,13 @@ pub fn execute_statement(
             });
 
             if let Some(name) = &definition.name {
-                scope.insert_binding(name, function.clone());
+                context.scope.insert_binding(name, function.clone());
             }
 
             Ok(function)
         }
         ast::Statement::Import(import) => {
-            let module = load_module(&import.1)?;
+            let module = load_module(&import.1, context)?;
 
             for symbol in &import.0 {
                 let value = module.export(&symbol.0)?;
@@ -46,7 +46,7 @@ pub fn execute_statement(
                     symbol.1.clone().unwrap()
                 };
 
-                scope.insert_binding(&name, value.clone());
+                context.scope.insert_binding(&name, value.clone());
             }
 
             Ok(Value::Module(module))

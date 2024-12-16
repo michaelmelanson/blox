@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use blox_interpreter::{execute_program, Scope, Value};
+use blox_interpreter::{execute_program, EvaluationContext, Scope, Value};
 use blox_language::{ast, ParseError, Parser};
 
 pub fn parse(code: &str) -> Result<ast::Program, ParseError> {
@@ -14,8 +14,8 @@ pub fn assert_result(code: &str, expected: Value) {
         Err(e) => panic!("Parsing error: {}", e),
     };
 
-    let mut scope = Arc::new(Scope::default());
-    let result = execute_program(&program, &mut scope);
+    let mut context = EvaluationContext::new("..", &Arc::new(Scope::default()));
+    let result = execute_program(&program, &mut context);
 
     match &result {
         Ok(value) => assert_eq!(

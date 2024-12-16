@@ -8,15 +8,15 @@ use blox_interpreter::{start_repl, Intrinsic, Value};
 use blox_language::ast::Identifier;
 use tracing::info;
 
-use crate::environment::create_scope;
+use crate::environment::create_context;
 
 pub async fn console_command(directory: &str) -> Result<(), anyhow::Error> {
     let assets = AssetManager::new(&directory)?;
     let assets = Arc::new(Mutex::new(assets));
 
-    let scope = create_scope(assets);
+    let context = create_context(assets);
 
-    scope.insert_binding(
+    context.scope.insert_binding(
         &Identifier("print".to_string()),
         Value::Intrinsic(Intrinsic::new(
             "print",
@@ -30,9 +30,7 @@ pub async fn console_command(directory: &str) -> Result<(), anyhow::Error> {
         )),
     );
 
-    let scope = Arc::new(scope);
-
-    start_repl(scope)?;
+    start_repl(context)?;
 
     Ok(())
 }

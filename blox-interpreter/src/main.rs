@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use blox_interpreter::{start_repl, BloxReplError, Scope};
+use blox_interpreter::{start_repl, BloxReplError, EvaluationContext};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -15,8 +13,8 @@ pub fn main() -> Result<(), BloxReplError> {
     if let Some(file) = args.file {
         println!("File: {}", file);
     } else {
-        let scope = Arc::new(Scope::default());
-        start_repl(scope)?;
+        let context = EvaluationContext::default();
+        start_repl(context)?;
     }
 
     Ok(())

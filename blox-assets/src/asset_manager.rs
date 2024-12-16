@@ -84,6 +84,10 @@ impl AssetManager {
         Ok(())
     }
 
+    pub fn base_dir(&self) -> &PathBuf {
+        &self.base_dir
+    }
+
     pub fn on_change(&self) -> Arc<Notify> {
         self.on_change.clone()
     }
