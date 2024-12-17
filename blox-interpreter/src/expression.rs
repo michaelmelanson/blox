@@ -2,14 +2,14 @@ use std::collections::{BTreeMap, HashMap};
 
 use blox_language::ast::{self, Argument, ArrayIndex, If, Object, ObjectIndex};
 use rust_decimal::Decimal;
-use tracing::trace;
+use tracing::{trace, Level};
 
 use crate::{
     module::EvaluationContext, program::evaluate_block, value::Function, Intrinsic, RuntimeError,
     Value,
 };
 
-#[tracing::instrument(level = "trace", skip(context), ret)]
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 pub fn evaluate_expression(
     expression: &ast::Expression,
     context: &mut EvaluationContext,
@@ -17,113 +17,124 @@ pub fn evaluate_expression(
     match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, context),
         ast::Expression::BinaryExpression(lhs, operator, rhs) => {
-            let lhs_value = evaluate_expression(lhs, context)?;
-            let rhs_value = evaluate_expression(rhs, context)?;
-
-            let result = match (&lhs_value, operator, &rhs_value) {
-                (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
-                    Ok(Value::Number(lhs + rhs))
-                }
-                (Value::Number(lhs), ast::Operator::Subtract, Value::Number(rhs)) => {
-                    Ok(Value::Number(lhs - rhs))
-                }
-                (Value::Number(lhs), ast::Operator::Multiply, Value::Number(rhs)) => {
-                    Ok(Value::Number(lhs * rhs))
-                }
-                (Value::String(lhs), ast::Operator::Concatenate, Value::String(rhs)) => {
-                    Ok(Value::String(format!("{lhs}{rhs}")))
-                }
-                (Value::Array(lhs), ast::Operator::Concatenate, Value::Array(rhs)) => {
-                    let mut result = lhs.clone();
-                    result.extend(rhs.clone());
-                    Ok(Value::Array(result))
-                }
-
-                (Value::Array(lhs), ast::Operator::Equal, Value::Array(rhs)) => {
-                    Ok(Value::Boolean(lhs == rhs))
-                }
-                (Value::Boolean(lhs), ast::Operator::Equal, Value::Boolean(rhs)) => {
-                    Ok(Value::Boolean(lhs == rhs))
-                }
-                (Value::Number(lhs), ast::Operator::Equal, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs == rhs))
-                }
-                (Value::String(lhs), ast::Operator::Equal, Value::String(rhs)) => {
-                    Ok(Value::Boolean(lhs == rhs))
-                }
-                (Value::Symbol(lhs), ast::Operator::Equal, Value::Symbol(rhs)) => {
-                    Ok(Value::Boolean(lhs == rhs))
-                }
-                (_, ast::Operator::Equal, _) => Ok(Value::Boolean(false)),
-
-                (Value::Array(lhs), ast::Operator::NotEqual, Value::Array(rhs)) => {
-                    Ok(Value::Boolean(lhs != rhs))
-                }
-                (Value::Boolean(lhs), ast::Operator::NotEqual, Value::Boolean(rhs)) => {
-                    Ok(Value::Boolean(lhs != rhs))
-                }
-                (Value::Number(lhs), ast::Operator::NotEqual, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs != rhs))
-                }
-                (Value::String(lhs), ast::Operator::NotEqual, Value::String(rhs)) => {
-                    Ok(Value::Boolean(lhs != rhs))
-                }
-                (Value::Symbol(lhs), ast::Operator::NotEqual, Value::Symbol(rhs)) => {
-                    Ok(Value::Boolean(lhs != rhs))
-                }
-                (_, ast::Operator::NotEqual, _) => Ok(Value::Boolean(false)),
-
-                (Value::Number(lhs), ast::Operator::GreaterOrEqual, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs >= rhs))
-                }
-                (_, ast::Operator::GreaterOrEqual, _) => Ok(Value::Boolean(false)),
-
-                (Value::Number(lhs), ast::Operator::GreaterThan, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs > rhs))
-                }
-                (_, ast::Operator::GreaterThan, _) => Ok(Value::Boolean(false)),
-
-                (Value::Number(lhs), ast::Operator::LessOrEqual, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs <= rhs))
-                }
-                (_, ast::Operator::LessOrEqual, _) => Ok(Value::Boolean(false)),
-
-                (Value::Number(lhs), ast::Operator::LessThan, Value::Number(rhs)) => {
-                    Ok(Value::Boolean(lhs < rhs))
-                }
-                (_, ast::Operator::LessThan, _) => Ok(Value::Boolean(false)),
-
-                (Value::Array(lhs), ast::Operator::Append, rhs) => {
-                    let mut lhs = lhs.clone();
-                    lhs.push(rhs.clone());
-                    Ok(Value::Array(lhs))
-                }
-
-                (lhs_value, operator, rhs_value) => Err(RuntimeError::InvalidOperands {
-                    lhs_expression: *lhs.clone(),
-                    lhs_value: lhs_value.clone(),
-                    operator: operator.clone(),
-                    rhs_expression: *rhs.clone(),
-                    rhs_value: rhs_value.clone(),
-                }),
-            }?;
-
-            // if operator is a mutating operator, update the lhs value in the scope
-            match operator {
-                ast::Operator::Append => {
-                    assign_to_expression(lhs, result.clone(), context)?;
-                }
-
-                _ => {}
-            }
-
-            trace!("{lhs_value} {operator} {rhs_value} => {result}");
-
-            Ok(result)
+            evaluate_binary_expression(lhs, operator, rhs, context)
         }
     }
 }
 
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
+pub fn evaluate_binary_expression(
+    lhs: &Box<ast::Expression>,
+    operator: &ast::Operator,
+    rhs: &Box<ast::Expression>,
+    context: &mut EvaluationContext,
+) -> Result<Value, RuntimeError> {
+    let lhs_value = evaluate_expression(lhs, context)?;
+    let rhs_value = evaluate_expression(rhs, context)?;
+
+    let result = match (&lhs_value, operator, &rhs_value) {
+        (Value::Number(lhs), ast::Operator::Add, Value::Number(rhs)) => {
+            Ok(Value::Number(lhs + rhs))
+        }
+        (Value::Number(lhs), ast::Operator::Subtract, Value::Number(rhs)) => {
+            Ok(Value::Number(lhs - rhs))
+        }
+        (Value::Number(lhs), ast::Operator::Multiply, Value::Number(rhs)) => {
+            Ok(Value::Number(lhs * rhs))
+        }
+        (Value::String(lhs), ast::Operator::Concatenate, Value::String(rhs)) => {
+            Ok(Value::String(format!("{lhs}{rhs}")))
+        }
+        (Value::Array(lhs), ast::Operator::Concatenate, Value::Array(rhs)) => {
+            let mut result = lhs.clone();
+            result.extend(rhs.clone());
+            Ok(Value::Array(result))
+        }
+
+        (Value::Array(lhs), ast::Operator::Equal, Value::Array(rhs)) => {
+            Ok(Value::Boolean(lhs == rhs))
+        }
+        (Value::Boolean(lhs), ast::Operator::Equal, Value::Boolean(rhs)) => {
+            Ok(Value::Boolean(lhs == rhs))
+        }
+        (Value::Number(lhs), ast::Operator::Equal, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs == rhs))
+        }
+        (Value::String(lhs), ast::Operator::Equal, Value::String(rhs)) => {
+            Ok(Value::Boolean(lhs == rhs))
+        }
+        (Value::Symbol(lhs), ast::Operator::Equal, Value::Symbol(rhs)) => {
+            Ok(Value::Boolean(lhs == rhs))
+        }
+        (_, ast::Operator::Equal, _) => Ok(Value::Boolean(false)),
+
+        (Value::Array(lhs), ast::Operator::NotEqual, Value::Array(rhs)) => {
+            Ok(Value::Boolean(lhs != rhs))
+        }
+        (Value::Boolean(lhs), ast::Operator::NotEqual, Value::Boolean(rhs)) => {
+            Ok(Value::Boolean(lhs != rhs))
+        }
+        (Value::Number(lhs), ast::Operator::NotEqual, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs != rhs))
+        }
+        (Value::String(lhs), ast::Operator::NotEqual, Value::String(rhs)) => {
+            Ok(Value::Boolean(lhs != rhs))
+        }
+        (Value::Symbol(lhs), ast::Operator::NotEqual, Value::Symbol(rhs)) => {
+            Ok(Value::Boolean(lhs != rhs))
+        }
+        (_, ast::Operator::NotEqual, _) => Ok(Value::Boolean(false)),
+
+        (Value::Number(lhs), ast::Operator::GreaterOrEqual, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs >= rhs))
+        }
+        (_, ast::Operator::GreaterOrEqual, _) => Ok(Value::Boolean(false)),
+
+        (Value::Number(lhs), ast::Operator::GreaterThan, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs > rhs))
+        }
+        (_, ast::Operator::GreaterThan, _) => Ok(Value::Boolean(false)),
+
+        (Value::Number(lhs), ast::Operator::LessOrEqual, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs <= rhs))
+        }
+        (_, ast::Operator::LessOrEqual, _) => Ok(Value::Boolean(false)),
+
+        (Value::Number(lhs), ast::Operator::LessThan, Value::Number(rhs)) => {
+            Ok(Value::Boolean(lhs < rhs))
+        }
+        (_, ast::Operator::LessThan, _) => Ok(Value::Boolean(false)),
+
+        (Value::Array(lhs), ast::Operator::Append, rhs) => {
+            let mut lhs = lhs.clone();
+            lhs.push(rhs.clone());
+            Ok(Value::Array(lhs))
+        }
+
+        (lhs_value, operator, rhs_value) => Err(RuntimeError::InvalidOperands {
+            lhs_expression: *lhs.clone(),
+            lhs_value: lhs_value.clone(),
+            operator: operator.clone(),
+            rhs_expression: *rhs.clone(),
+            rhs_value: rhs_value.clone(),
+        }),
+    }?;
+
+    // if operator is a mutating operator, update the lhs value in the scope
+    match operator {
+        ast::Operator::Append => {
+            assign_to_expression(lhs, result.clone(), context)?;
+        }
+
+        _ => {}
+    }
+
+    trace!("{lhs_value} {operator} {rhs_value} => {result}");
+
+    Ok(result)
+}
+
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 pub fn assign_to_expression(
     target: &ast::Expression,
     value: Value,
@@ -213,6 +224,7 @@ pub fn cast_to_number(value: Value, context: &ast::Expression) -> Result<Decimal
     }
 }
 
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 pub fn evaluate_expression_term(
     term: &ast::ExpressionTerm,
     context: &mut EvaluationContext,
@@ -366,6 +378,7 @@ pub fn evaluate_expression_term(
     Ok(result)
 }
 
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 fn evaluate_condition(
     expression: &ast::Expression,
     context: &mut EvaluationContext,
@@ -386,6 +399,7 @@ fn evaluate_condition(
     Ok(is_truthy)
 }
 
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 pub fn evaluate_method_call(
     method_call: &ast::MethodCall,
     context: &mut EvaluationContext,
@@ -422,6 +436,7 @@ pub fn evaluate_method_call(
     evaluate_function_call(&function_call, context)
 }
 
+#[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
 pub fn evaluate_function_call(
     function_call: &ast::FunctionCall,
     context: &mut EvaluationContext,
