@@ -4,7 +4,7 @@ use std::{
 };
 
 use blox_assets::{types::AssetPath, AssetError, AssetManager};
-use blox_interpreter::{execute_program, EvaluationContext, Scope, Value};
+use blox_interpreter::{execute_program, Scope, Value};
 use blox_language::ast::Identifier;
 use http_body_util::Full;
 use hyper::{body::Bytes, server::conn::http1, service::service_fn, Request, Response};
@@ -22,7 +22,7 @@ pub async fn server_command(port: u16, path: String) -> Result<(), anyhow::Error
     let assets = AssetManager::new(&path)?;
     let assets = Arc::new(Mutex::new(assets));
 
-    let environment = BloxEnvironment::new(assets.clone());
+    let environment = Arc::new(BloxEnvironment::new(assets.clone()));
     environment.start();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
@@ -32,12 +32,11 @@ pub async fn server_command(port: u16, path: String) -> Result<(), anyhow::Error
     loop {
         let (tcp, _) = listener.accept().await?;
         let io = TokioIo::new(tcp);
-
-        let assets = assets.clone();
+        let environment = environment.clone();
 
         tokio::task::spawn(async move {
             let service = service_fn(|req: Request<hyper::body::Incoming>| async {
-                handle_request(req, assets.clone()).await
+                handle_request(req, &environment).await
             });
 
             if let Err(err) = http1::Builder::new()
@@ -51,10 +50,10 @@ pub async fn server_command(port: u16, path: String) -> Result<(), anyhow::Error
     }
 }
 
-#[instrument(skip(request, assets), fields(method, uri))]
+#[instrument(skip(request, environment), fields(method, uri))]
 pub async fn handle_request(
     request: Request<hyper::body::Incoming>,
-    assets: Arc<Mutex<AssetManager>>,
+    environment: &Arc<BloxEnvironment>,
 ) -> anyhow::Result<Response<Full<Bytes>>> {
     let method = request.method();
     let uri = request.uri();
@@ -67,6 +66,7 @@ pub async fn handle_request(
 
     info!(?path, "Requesting asset");
 
+    let assets = environment.assets();
     let mut assets = assets.lock().unwrap();
 
     let scope = Arc::new(Scope::default());
@@ -74,7 +74,7 @@ pub async fn handle_request(
         scope.insert_binding(&Identifier(name.clone()), Value::String(value))
     }
 
-    let mut context = EvaluationContext::new(".".to_string(), &scope);
+    let mut context = environment.context().read().unwrap().child();
 
     debug!(?path, "Loading asset");
     match path {

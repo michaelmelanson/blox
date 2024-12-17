@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
 use blox_interpreter::{execute_program, EvaluationContext, Scope, Value};
 use blox_language::{ast, ParseError, Parser};
@@ -14,7 +17,11 @@ pub fn assert_result(code: &str, expected: Value) {
         Err(e) => panic!("Parsing error: {}", e),
     };
 
-    let mut context = EvaluationContext::new("..", &Arc::new(Scope::default()));
+    let mut context = EvaluationContext::new(
+        "..",
+        Arc::new(Scope::default()),
+        Arc::new(RwLock::new(BTreeMap::new())),
+    );
     let result = execute_program(&program, &mut context);
 
     match &result {

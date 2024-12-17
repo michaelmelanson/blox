@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
 use blox_language::ast;
 
@@ -8,6 +11,7 @@ use crate::{program::evaluate_block, RuntimeError, Scope, Value};
 pub struct EvaluationContext {
     pub import_base_dir: String,
     pub scope: Arc<Scope>,
+    pub import_cache: Arc<RwLock<BTreeMap<String, Module>>>,
 }
 
 impl Default for EvaluationContext {
@@ -15,15 +19,21 @@ impl Default for EvaluationContext {
         Self {
             import_base_dir: ".".to_string(),
             scope: Arc::new(Scope::default()),
+            import_cache: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 }
 
 impl EvaluationContext {
-    pub fn new(import_base_dir: impl ToString, scope: &Arc<Scope>) -> Self {
+    pub fn new(
+        import_base_dir: impl ToString,
+        scope: Arc<Scope>,
+        import_cache: Arc<RwLock<BTreeMap<String, Module>>>,
+    ) -> Self {
         Self {
             import_base_dir: import_base_dir.to_string(),
-            scope: scope.clone(),
+            scope,
+            import_cache,
         }
     }
 
@@ -31,19 +41,31 @@ impl EvaluationContext {
         Self {
             import_base_dir: self.import_base_dir.clone(),
             scope: self.scope.child(),
+            import_cache: self.import_cache.clone(),
         }
     }
 
     pub fn child_with_scope(&self, call_scope: Arc<Scope>) -> Self {
         Self {
             import_base_dir: self.import_base_dir.clone(),
+            import_cache: self.import_cache.clone(),
             scope: call_scope,
         }
     }
 }
 
-pub fn load_module(path: &str, context: &EvaluationContext) -> Result<Module, RuntimeError> {
-    let filename = format!("{}/{}.blox", context.import_base_dir, path);
+pub fn load_module(
+    import_path: &str,
+    context: &mut EvaluationContext,
+) -> Result<Module, RuntimeError> {
+    let mut import_cache = context.import_cache.write().expect("import cache poisoned");
+
+    if let Some(module) = import_cache.get(import_path) {
+        return Ok(module.clone());
+    }
+
+    let filename = format!("{}/{}.blox", context.import_base_dir, import_path);
+
     // resolve the filename
     let filename = std::fs::canonicalize(&filename)
         .map_err(|err| RuntimeError::ModuleNotFound(err.to_string()))?
@@ -53,7 +75,11 @@ pub fn load_module(path: &str, context: &EvaluationContext) -> Result<Module, Ru
 
     let source = std::fs::read_to_string(&filename)
         .map_err(|_| RuntimeError::ModuleNotFound(filename.clone()))?;
-    load_module_from_string(path, &source, context)
+    let module = load_module_from_string(import_path, &source, context)?;
+
+    import_cache.insert(import_path.to_string(), module.clone());
+
+    Ok(module)
 }
 
 pub fn load_module_from_string(

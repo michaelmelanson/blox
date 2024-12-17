@@ -17,6 +17,14 @@ impl BloxEnvironment {
         BloxEnvironment { assets, context }
     }
 
+    pub fn context(&self) -> Arc<RwLock<EvaluationContext>> {
+        self.context.clone()
+    }
+
+    pub fn assets(&self) -> Arc<Mutex<AssetManager>> {
+        self.assets.clone()
+    }
+
     pub fn start(&self) {
         let on_change = self.assets.lock().unwrap().on_change();
         let assets = self.assets.clone();
@@ -34,11 +42,13 @@ impl BloxEnvironment {
     }
 }
 
+// standard library modules statically included in the binary
+// so that they can be loaded without reading from the filesystem
 const STDLIB: [(&'static str, &'static str); 3] = [
-    ("stdlib/math.blox", include_str!("../../stdlib/math.blox")),
-    ("stdlib/list.blox", include_str!("../../stdlib/list.blox")),
+    ("stdlib/math", include_str!("../../stdlib/math.blox")),
+    ("stdlib/list", include_str!("../../stdlib/list.blox")),
     (
-        "stdlib/database.blox",
+        "stdlib/database",
         include_str!("../../stdlib/database.blox"),
     ),
 ];
@@ -50,17 +60,21 @@ pub(crate) fn create_context(assets: Arc<Mutex<AssetManager>>) -> EvaluationCont
         .to_str()
         .expect("could not convert asset base dir to string");
 
-    let context = EvaluationContext::new(base_dir, &Arc::new(Scope::default()));
+    let import_cache = Arc::new(RwLock::new(Default::default()));
+
+    let loader_context =
+        EvaluationContext::new(base_dir, Arc::new(Scope::default()), import_cache.clone());
 
     // load the standard library
     for (path, source) in STDLIB.iter() {
-        let module = load_module_from_string(path, source, &context)
+        let module = load_module_from_string(path, source, &loader_context)
             .expect("failed to load stdlib module {path}");
 
-        module.exports.iter().for_each(|(name, value)| {
-            context.scope.insert_binding(name, value.clone());
-        });
+        import_cache
+            .write()
+            .unwrap()
+            .insert(path.to_string(), module);
     }
 
-    context
+    EvaluationContext::new(base_dir, Arc::new(Scope::default()), import_cache)
 }
