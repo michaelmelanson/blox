@@ -18,5 +18,5 @@ regex = "1"
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 tokio = { version = "1", features = ["full"] }
-handlebars = "5"
+handlebars = "6"
 tracing = "0.1"
