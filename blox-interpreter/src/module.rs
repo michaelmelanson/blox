@@ -54,6 +54,31 @@ impl EvaluationContext {
     }
 }
 
+// standard library modules statically included in the binary
+// so that they can be loaded without reading from the filesystem
+const STDLIB: [(&'static str, &'static str); 3] = [
+    ("stdlib/math", include_str!("../../stdlib/math.blox")),
+    ("stdlib/list", include_str!("../../stdlib/list.blox")),
+    (
+        "stdlib/database",
+        include_str!("../../stdlib/database.blox"),
+    ),
+];
+
+pub fn load_stdlib(context: &mut EvaluationContext) {
+    // load the standard library
+    for (path, source) in STDLIB.iter() {
+        let module = load_module_from_string(path, source, &context)
+            .expect("failed to load stdlib module {path}");
+
+        context
+            .import_cache
+            .write()
+            .unwrap()
+            .insert(path.to_string(), module);
+    }
+}
+
 pub fn load_module(
     import_path: &str,
     context: &mut EvaluationContext,

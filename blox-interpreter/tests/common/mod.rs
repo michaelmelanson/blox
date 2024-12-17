@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use blox_interpreter::{execute_program, EvaluationContext, Scope, Value};
+use blox_interpreter::{execute_program, load_stdlib, EvaluationContext, Scope, Value};
 use blox_language::{ast, ParseError, Parser};
 
 pub fn parse(code: &str) -> Result<ast::Program, ParseError> {
@@ -22,6 +22,8 @@ pub fn assert_result(code: &str, expected: Value) {
         Arc::new(Scope::default()),
         Arc::new(RwLock::new(BTreeMap::new())),
     );
+    load_stdlib(&mut context);
+
     let result = execute_program(&program, &mut context);
 
     match &result {

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use ::tokio::spawn;
 use blox_assets::AssetManager;
-use blox_interpreter::{load_module_from_string, EvaluationContext, Scope};
+use blox_interpreter::{load_module_from_string, load_stdlib, EvaluationContext, Scope};
 use tracing::info;
 
 pub struct BloxEnvironment {
@@ -42,17 +42,6 @@ impl BloxEnvironment {
     }
 }
 
-// standard library modules statically included in the binary
-// so that they can be loaded without reading from the filesystem
-const STDLIB: [(&'static str, &'static str); 3] = [
-    ("stdlib/math", include_str!("../../stdlib/math.blox")),
-    ("stdlib/list", include_str!("../../stdlib/list.blox")),
-    (
-        "stdlib/database",
-        include_str!("../../stdlib/database.blox"),
-    ),
-];
-
 pub(crate) fn create_context(assets: Arc<Mutex<AssetManager>>) -> EvaluationContext {
     let asset_manager = assets.lock().unwrap();
     let base_dir = asset_manager
@@ -62,19 +51,10 @@ pub(crate) fn create_context(assets: Arc<Mutex<AssetManager>>) -> EvaluationCont
 
     let import_cache = Arc::new(RwLock::new(Default::default()));
 
-    let loader_context =
+    let mut loader_context =
         EvaluationContext::new(base_dir, Arc::new(Scope::default()), import_cache.clone());
 
-    // load the standard library
-    for (path, source) in STDLIB.iter() {
-        let module = load_module_from_string(path, source, &loader_context)
-            .expect("failed to load stdlib module {path}");
-
-        import_cache
-            .write()
-            .unwrap()
-            .insert(path.to_string(), module);
-    }
+    load_stdlib(&mut loader_context);
 
     EvaluationContext::new(base_dir, Arc::new(Scope::default()), import_cache)
 }

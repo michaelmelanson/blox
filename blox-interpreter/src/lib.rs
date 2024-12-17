@@ -9,7 +9,7 @@ mod value;
 
 pub use self::{
     error::RuntimeError,
-    module::{load_module_from_string, EvaluationContext},
+    module::{load_module_from_string, load_stdlib, EvaluationContext},
     program::execute_program,
     repl::{start_repl, BloxReplError},
     scope::Scope,
