@@ -14,16 +14,19 @@ When you need a variable in Blox, start with `let`. Your variables can't be chan
 ```
 
 === Working with SQL
-When you need to run database queries, write them using backticks. You can include variables right in your query using curly braces:
+When you need to create database queries, use the query builder in `stdlib/database`:
 
-  ```sql SELECT * FROM users WHERE id = {userId} ```.execute(db)
-  ```sql INSERT INTO users (name, age) VALUES ({user.name}, {user.age}) ```.execute(db)
-  ```sql UPDATE posts SET title = {title} WHERE author_id = {currentUser.id} ```.execute(db)
+```blox
+import { select, table, to_sql } from "stdlib/database";
 
-You can store queries in variables and reuse them:
+let users = table("users");
+users
+    .select(column: users.column(name: "name"))
+    .where(column: users.column(name: "age").eq(value: 30))
+    .to_sql();
+```
 
-  let activeUsersQuery = ```sql SELECT * FROM users WHERE active = true ```
-  let result = activeUsersQuery.execute(db)
+TODO: The code to actually execute queries is not implemented yet.
 
 All queries are automatically protected against SQL injection attacks through proper parameter escaping.
 
