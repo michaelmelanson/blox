@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use ::tokio::spawn;
 use blox_assets::AssetManager;
-use blox_interpreter::{load_module_from_string, load_stdlib, EvaluationContext, Scope};
+use blox_interpreter::{load_stdlib, EvaluationContext, Scope};
 use tracing::info;
 
 pub struct BloxEnvironment {

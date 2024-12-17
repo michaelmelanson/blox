@@ -1,4 +1,4 @@
-use blox_interpreter::{load_stdlib, start_repl, BloxReplError, EvaluationContext};
+use blox_interpreter::{start_repl, BloxReplError, EvaluationContext};
 use clap::Parser;
 
 #[derive(Parser)]
