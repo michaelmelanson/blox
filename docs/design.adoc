@@ -51,6 +51,18 @@ updateSettings(theme: "dark", notifications: true, fontSize: 14)
 
 This makes it obvious what each value means and helps prevent mistakes from mixing up the order of arguments.
 
+== Method calls
+
+You can call functions using a method calling syntax on a value. In this case the object is passed as the first argument to the function:
+
+```blox
+let user = { name: "Alice", age: 30 }
+
+user.print()
+# is equivalent to
+print(value: user)
+```
+
 == Web framework
 Blox was built to make web development feel natural and easy. If you've done any web development before, you'll feel right at home. Everything is organized in a way that just makes sense for building web applications - from routing to forms to data access.
 
