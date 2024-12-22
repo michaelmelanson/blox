@@ -33,15 +33,15 @@ mod tests {
     fn parse_let_bindings() {
         let actual = parse(&"let test = 55".to_string()).expect("parse error");
         assert_eq!(
-            ast::Block(vec![ast::Statement::Binding(
+            vec![ast::Statement::Binding(
                 ast::Identifier {
                     name: "test".to_string()
                 },
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(
                     55.into()
                 )))
-            )]),
-            actual.block
+            )],
+            actual.block.statements
         );
     }
 
@@ -49,7 +49,7 @@ mod tests {
     fn parse_expressions() {
         let actual = parse(&"let test = 55 + 42".to_string()).expect("parse error");
         assert_eq!(
-            ast::Block(vec![ast::Statement::Binding(
+            vec![ast::Statement::Binding(
                 ast::Identifier {
                     name: "test".to_string()
                 },
@@ -62,8 +62,8 @@ mod tests {
                         ast::Literal::Number(42.into())
                     )))
                 )
-            )]),
-            actual.block
+            )],
+            actual.block.statements
         );
     }
 
@@ -71,7 +71,7 @@ mod tests {
     fn test_nested_expressions() {
         let actual = parse(&"let test = (1 * 2) + 3".to_string()).expect("parse error");
         assert_eq!(
-            ast::Block(vec![ast::Statement::Binding(
+            vec![ast::Statement::Binding(
                 ast::Identifier {
                     name: "test".to_string()
                 },
@@ -90,8 +90,8 @@ mod tests {
                         ast::Literal::Number(3.into())
                     )))
                 )
-            )]),
-            actual.block
+            )],
+            actual.block.statements
         );
     }
 
@@ -99,15 +99,15 @@ mod tests {
     fn test_symbols() {
         let actual = parse(&"let test = :symbol".to_string()).expect("parse error");
         assert_eq!(
-            ast::Block(vec![ast::Statement::Binding(
+            vec![ast::Statement::Binding(
                 ast::Identifier {
                     name: "test".to_string()
                 },
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Symbol(
                     "symbol".to_string()
                 )))
-            )]),
-            actual.block
+            )],
+            actual.block.statements
         );
     }
 }

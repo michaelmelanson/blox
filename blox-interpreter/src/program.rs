@@ -16,7 +16,7 @@ pub fn evaluate_block(
 ) -> Result<Value, RuntimeError> {
     let mut value = Value::Void;
 
-    for statement in &block.0 {
+    for statement in &block.statements {
         value = execute_statement(statement, context)?;
     }
 

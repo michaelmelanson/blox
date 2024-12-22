@@ -26,6 +26,13 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn location(&self, node: Node<'_>) -> Location {
+        Location {
+            file: self.file.clone(),
+            range: node.range(),
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn parse(&self) -> Result<ast::Program, ParseError> {
         trace!(source = self.source);
@@ -61,10 +68,7 @@ impl<'a> Parser<'a> {
         let block = self.parse_block(node)?;
         Ok(ast::Program {
             block,
-            location: Location {
-                file: self.file.clone(),
-                range: node.range(),
-            },
+            location: self.location(node),
         })
     }
 
@@ -76,7 +80,10 @@ impl<'a> Parser<'a> {
             statements.push(self.parse_statement(child)?);
         }
 
-        Ok(ast::Block(statements))
+        Ok(ast::Block {
+            statements,
+            location: self.location(node),
+        })
     }
 
     fn parse_statement(&self, node: Node<'_>) -> Result<ast::Statement, ParseError> {

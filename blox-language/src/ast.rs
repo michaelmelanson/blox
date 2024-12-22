@@ -1,48 +1,14 @@
+mod block;
 mod identifier;
 mod program;
+mod statement;
 
 use rust_decimal::Decimal;
 
+pub use block::Block;
 pub use identifier::Identifier;
 pub use program::Program;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Block(pub Vec<Statement>);
-
-impl std::fmt::Display for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{ ")?;
-
-        for (index, statement) in self.0.iter().enumerate() {
-            write!(f, "{}", statement)?;
-
-            if index < self.0.len() - 1 {
-                writeln!(f, ";")?;
-            }
-        }
-
-        write!(f, " }}")
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Statement {
-    Definition(Definition),
-    Binding(Identifier, Expression),
-    Import(Import),
-    Expression(Expression),
-}
-
-impl std::fmt::Display for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Statement::Definition(def) => write!(f, "{}", def),
-            Statement::Binding(lhs, rhs) => write!(f, "let {} = {}", lhs.name, rhs),
-            Statement::Import(import) => write!(f, "{}", import),
-            Statement::Expression(expr) => write!(f, "{}", expr),
-        }
-    }
-}
+pub use statement::Statement;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Definition {
