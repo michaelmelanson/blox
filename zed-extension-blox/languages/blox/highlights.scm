@@ -3,6 +3,7 @@
   "def"
   "import"
   "if"
+  "else"
 ] @keyword
 
 [
@@ -19,8 +20,13 @@
 
 (number) @number
 (string) @string
+(symbol) @string.special.symbol
+(object_member key: (identifier) @string.special.symbol)
 
 [
+  (negate)
+  (not)
+
   (multiply)
   (divide)
   (concatenate)

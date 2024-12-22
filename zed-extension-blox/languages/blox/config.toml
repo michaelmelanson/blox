@@ -1,0 +1,4 @@
+name = "Blox"
+grammar = "blox"
+path_suffixes = ["blox"]
+line_comments = ["#"]

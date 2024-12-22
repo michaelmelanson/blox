@@ -1,0 +1,11 @@
+id = "blox-language"
+name = "Blox language"
+version = "0.0.1"
+schema_version = 1
+authors = ["Michael Melanson <michael@michaelmelanson.net>"]
+description = "Language extension for the Blox progamming language"
+repository = "https://github.com/michaelmelanson/blox"
+
+[grammars.blox]
+repository = "https://github.com/michaelmelanson/tree-sitter-blox"
+rev = "bf8897d65862157bf56dd4fd70518d859e52760c"
