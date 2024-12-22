@@ -1,6 +1,7 @@
 use crate::db_connection::DbConnection;
 
 pub struct QueryBuilder<'a> {
+    #[allow(dead_code)]
     connection: &'a DbConnection,
 }
 
