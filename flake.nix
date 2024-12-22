@@ -23,6 +23,7 @@
             pkgs.tailwindcss
             pkgs.tree-sitter
             pkgs.lldb
+            pkgs.rust-analyzer
             frameworks.SystemConfiguration
             frameworks.CoreServices
           ];
