@@ -7,7 +7,7 @@ pub fn execute_program(
     program: &ast::Program,
     context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
-    evaluate_block(&program.0, context)
+    evaluate_block(&program.block, context)
 }
 
 pub fn evaluate_block(
@@ -30,7 +30,7 @@ mod tests {
     use super::*;
 
     fn parse(code: &str) -> Result<ast::Program, ParseError> {
-        let parser = Parser::new(code);
+        let parser = Parser::new("<test>", code);
         parser.parse()
     }
 

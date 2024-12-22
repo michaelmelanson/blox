@@ -1,27 +1,45 @@
 pub mod ast;
 pub mod error;
+pub mod location;
 pub mod parser;
 
 #[cfg(test)]
 mod tests {
-    use crate::{ast, error::ParseError, parser::Parser};
+    use crate::{ast, error::ParseError, location::Location, parser::Parser};
 
     fn parse(input: &str) -> Result<ast::Program, ParseError> {
-        let parser = Parser::new(input);
+        let parser = Parser::new("<test>", input);
         parser.parse()
+    }
+
+    #[test]
+    fn parse_records_locations() {
+        let actual = parse(&"let test = 55".to_string()).expect("parse error");
+        assert_eq!(
+            Location {
+                file: "<test>".to_string(),
+                range: tree_sitter::Range {
+                    start_byte: 0,
+                    end_byte: 13,
+                    start_point: tree_sitter::Point { row: 0, column: 0 },
+                    end_point: tree_sitter::Point { row: 0, column: 13 }
+                }
+            },
+            actual.location
+        );
     }
 
     #[test]
     fn parse_let_bindings() {
         let actual = parse(&"let test = 55".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program(ast::Block(vec![ast::Statement::Binding(
+            ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(
                     55.into()
                 )))
-            )])),
-            actual
+            )]),
+            actual.block
         );
     }
 
@@ -29,7 +47,7 @@ mod tests {
     fn parse_expressions() {
         let actual = parse(&"let test = 55 + 42".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program(ast::Block(vec![ast::Statement::Binding(
+            ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
@@ -40,8 +58,8 @@ mod tests {
                         ast::Literal::Number(42.into())
                     )))
                 )
-            )])),
-            actual
+            )]),
+            actual.block
         );
     }
 
@@ -49,7 +67,7 @@ mod tests {
     fn test_nested_expressions() {
         let actual = parse(&"let test = (1 * 2) + 3".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program(ast::Block(vec![ast::Statement::Binding(
+            ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::BinaryExpression(
@@ -66,8 +84,8 @@ mod tests {
                         ast::Literal::Number(3.into())
                     )))
                 )
-            )])),
-            actual
+            )]),
+            actual.block
         );
     }
 
@@ -75,13 +93,13 @@ mod tests {
     fn test_symbols() {
         let actual = parse(&"let test = :symbol".to_string()).expect("parse error");
         assert_eq!(
-            ast::Program(ast::Block(vec![ast::Statement::Binding(
+            ast::Block(vec![ast::Statement::Binding(
                 ast::Identifier("test".to_string()),
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Symbol(
                     "symbol".to_string()
                 )))
-            )])),
-            actual
+            )]),
+            actual.block
         );
     }
 }

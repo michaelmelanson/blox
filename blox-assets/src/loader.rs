@@ -1,5 +1,5 @@
 use crate::Asset;
 
 pub trait Loader<T: Asset> {
-    fn load(content: &[u8], extension: &str) -> anyhow::Result<T>;
+    fn load(path: &str, content: &[u8], extension: &str) -> anyhow::Result<T>;
 }

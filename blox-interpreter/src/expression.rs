@@ -497,7 +497,7 @@ mod tests {
     use super::evaluate_expression;
 
     fn parse_expression<'a>(code: String) -> Result<Expression, ParseError> {
-        let parser = Parser::new(&code);
+        let parser = Parser::new("<test>", &code);
         Ok(parser.parse_as_expression()?)
     }
 

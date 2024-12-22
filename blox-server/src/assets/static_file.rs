@@ -17,7 +17,7 @@ impl blox_assets::Asset for StaticFile {
 pub struct StaticFileLoader;
 
 impl blox_assets::Loader<StaticFile> for StaticFileLoader {
-    fn load(content: &[u8], _filename: &str) -> Result<StaticFile, anyhow::Error> {
+    fn load(_path: &str, content: &[u8], _filename: &str) -> Result<StaticFile, anyhow::Error> {
         Ok(StaticFile(content.to_vec()))
     }
 }

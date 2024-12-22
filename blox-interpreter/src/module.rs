@@ -112,7 +112,7 @@ pub fn load_module_from_string(
     source: &str,
     context: &EvaluationContext,
 ) -> Result<Module, RuntimeError> {
-    let parser = blox_language::parser::Parser::new(source);
+    let parser = blox_language::parser::Parser::new(path, source);
     let ast = parser.parse()?;
     let module = evalute_module(&path, ast, context)?;
     Ok(module)
@@ -124,7 +124,7 @@ pub fn evalute_module(
     context: &EvaluationContext,
 ) -> Result<Module, RuntimeError> {
     let mut context = context.child();
-    evaluate_block(&ast.0, &mut context)?;
+    evaluate_block(&ast.block, &mut context)?;
 
     let module = Module::new(
         path.to_string(),

@@ -35,7 +35,7 @@ pub fn start_repl(mut context: EvaluationContext) -> Result<(), BloxReplError> {
             Ok(line) => {
                 editor.add_history_entry(&line)?;
 
-                let parser = Parser::new(&line);
+                let parser = Parser::new("<repl>", &line);
 
                 match parser.parse() {
                     Ok(ast) => {

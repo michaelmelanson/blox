@@ -30,9 +30,9 @@ impl Display for BloxLoaderError {
 impl std::error::Error for BloxLoaderError {}
 
 impl blox_assets::Loader<BloxProgram> for BloxLoader {
-    fn load(content: &[u8], _extension: &str) -> anyhow::Result<BloxProgram> {
+    fn load(path: &str, content: &[u8], _extension: &str) -> anyhow::Result<BloxProgram> {
         let input = String::from_utf8(content.to_vec())?;
-        let parser = Parser::new(&input);
+        let parser = Parser::new(path, &input);
         parser
             .parse()
             .map_err(|err| Box::new(BloxLoaderError(format!("{:?}", err))).into())

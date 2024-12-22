@@ -140,8 +140,9 @@ impl AssetManager {
 
             if let Some((path, extension)) = matching_path {
                 let raw_contents = std::fs::read(path)?;
-                let asset = T::Loader::load(&raw_contents, &extension)?;
-                info!(path = path.to_string_lossy().to_string().as_str(), "loaded");
+                let path = path.to_string_lossy().to_string();
+                let asset = T::Loader::load(&path, &raw_contents, &extension)?;
+                info!(path, "loaded");
                 Ok(asset)
             } else {
                 Err(anyhow::Error::new(AssetError::NoMatchingExtension(

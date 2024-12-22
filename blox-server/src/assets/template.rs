@@ -37,7 +37,7 @@ impl blox_assets::Asset for Template {
 pub struct TemplateLoader;
 
 impl blox_assets::Loader<Template> for TemplateLoader {
-    fn load(content: &[u8], filename: &str) -> Result<Template, anyhow::Error> {
+    fn load(_path: &str, content: &[u8], filename: &str) -> Result<Template, anyhow::Error> {
         let input = String::from_utf8(content.to_vec())?;
 
         if filename.ends_with(".html.hbs") {

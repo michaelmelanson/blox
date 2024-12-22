@@ -2,15 +2,16 @@ use rust_decimal::Decimal;
 use tracing::trace;
 use tree_sitter::Node;
 
-use crate::{ast, error::ParseError};
+use crate::{ast, error::ParseError, location::Location};
 
 pub struct Parser<'a> {
+    file: String,
     source: &'a str,
     tree: tree_sitter::Tree,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str) -> Self {
+    pub fn new(file: impl ToString, source: &'a str) -> Self {
         let mut ts_parser = tree_sitter::Parser::new();
         let language = tree_sitter_blox::LANGUAGE;
         ts_parser
@@ -18,7 +19,11 @@ impl<'a> Parser<'a> {
             .expect("Error loading Blox parser");
         let tree = ts_parser.parse(source, None).unwrap();
 
-        Parser { source, tree }
+        Parser {
+            file: file.to_string(),
+            source,
+            tree,
+        }
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -54,7 +59,13 @@ impl<'a> Parser<'a> {
 
     fn parse_program(&self, node: Node<'_>) -> Result<ast::Program, ParseError> {
         let block = self.parse_block(node)?;
-        Ok(ast::Program(block))
+        Ok(ast::Program {
+            block,
+            location: Location {
+                file: self.file.clone(),
+                range: node.range(),
+            },
+        })
     }
 
     fn parse_block(&self, node: Node<'_>) -> Result<ast::Block, ParseError> {
