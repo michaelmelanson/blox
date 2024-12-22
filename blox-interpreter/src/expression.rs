@@ -488,7 +488,8 @@ pub fn evaluate_function_call(
 mod tests {
     use blox_language::{
         ast::{Expression, Identifier},
-        ParseError,
+        error::ParseError,
+        parser::Parser,
     };
 
     use crate::{EvaluationContext, Value};
@@ -496,7 +497,7 @@ mod tests {
     use super::evaluate_expression;
 
     fn parse_expression<'a>(code: String) -> Result<Expression, ParseError> {
-        let parser = blox_language::Parser::new(&code);
+        let parser = Parser::new(&code);
         Ok(parser.parse_as_expression()?)
     }
 

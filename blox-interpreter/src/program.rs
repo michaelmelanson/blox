@@ -25,7 +25,7 @@ pub fn evaluate_block(
 
 #[cfg(test)]
 mod tests {
-    use blox_language::{ParseError, Parser};
+    use blox_language::{error::ParseError, parser::Parser};
 
     use super::*;
 

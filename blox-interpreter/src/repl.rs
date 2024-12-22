@@ -1,4 +1,4 @@
-use blox_language::Parser;
+use blox_language::parser::Parser;
 use rustyline::error::ReadlineError;
 
 use crate::{execute_program, module::EvaluationContext};

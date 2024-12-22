@@ -1,4 +1,4 @@
-use blox_language::{ast, ParseError};
+use blox_language::{ast, error::ParseError};
 
 use crate::{module::Module, Value};
 

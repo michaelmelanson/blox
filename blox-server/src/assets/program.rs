@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use blox_language::{ast, Parser};
+use blox_language::{ast, parser::Parser};
 
 pub struct BloxProgram(ast::Program);
 

@@ -4,7 +4,7 @@ use std::{
 };
 
 use blox_interpreter::{execute_program, load_stdlib, EvaluationContext, Scope, Value};
-use blox_language::{ast, ParseError, Parser};
+use blox_language::{ast, error::ParseError, parser::Parser};
 
 pub fn parse(code: &str) -> Result<ast::Program, ParseError> {
     let parser = Parser::new(code);
