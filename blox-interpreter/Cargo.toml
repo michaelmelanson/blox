@@ -17,3 +17,4 @@ rustyline = { version = "15", default-features = false, features = [
     "with-file-history",
 ] }
 rust_decimal = { version = "1.36", default-features = false }
+stacker = { version = "0.1", default-features = false }

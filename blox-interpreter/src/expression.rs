@@ -14,12 +14,16 @@ pub fn evaluate_expression(
     expression: &ast::Expression,
     context: &mut EvaluationContext,
 ) -> Result<Value, RuntimeError> {
-    match expression {
+    // grow the stack here if needed, to avoid stack overflows on deeply nested expressions
+    const STACK_RED_ZONE: usize = 128 * 1024; // grow when there's less than this amount remaining
+    const STACK_BLOCK_SIZE: usize = 1024 * 1024; // grow by 1MB at a time
+
+    stacker::maybe_grow(STACK_RED_ZONE, STACK_BLOCK_SIZE, || match expression {
         ast::Expression::Term(term) => evaluate_expression_term(term, context),
         ast::Expression::BinaryExpression(lhs, operator, rhs) => {
             evaluate_binary_expression(lhs, operator, rhs, context)
         }
-    }
+    })
 }
 
 #[tracing::instrument(skip(context), ret(level=Level::TRACE), err(level=Level::DEBUG))]
