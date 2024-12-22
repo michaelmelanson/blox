@@ -282,7 +282,9 @@ impl<'a> Parser<'a> {
 
     fn parse_identifier(&self, node: Node<'_>) -> Result<ast::Identifier, ParseError> {
         let identifier = self.value(node.range());
-        Ok(ast::Identifier(identifier.to_string()))
+        Ok(ast::Identifier {
+            name: identifier.to_string(),
+        })
     }
 
     fn parse_literal(&self, node: Node<'_>) -> Result<ast::Literal, ParseError> {
@@ -471,7 +473,7 @@ impl<'a> Parser<'a> {
                 .expect("object member without value"),
         )?;
 
-        Ok((key.0, value))
+        Ok((key.name, value))
     }
 
     fn parse_object_index(&self, node: Node<'_>) -> Result<ast::ObjectIndex, ParseError> {

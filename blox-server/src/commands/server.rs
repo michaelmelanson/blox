@@ -71,7 +71,7 @@ pub async fn handle_request(
 
     let scope = Arc::new(Scope::default());
     for (name, value) in bindings {
-        scope.insert_binding(&Identifier(name.clone()), Value::String(value))
+        scope.insert_binding(&Identifier { name: name.clone() }, Value::String(value))
     }
 
     let mut context = environment.context().read().unwrap().child();

@@ -1,17 +1,10 @@
+mod identifier;
 mod program;
 
 use rust_decimal::Decimal;
 
+pub use identifier::Identifier;
 pub use program::Program;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Identifier(pub String);
-
-impl std::fmt::Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Block(pub Vec<Statement>);
@@ -44,7 +37,7 @@ impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Definition(def) => write!(f, "{}", def),
-            Statement::Binding(lhs, rhs) => write!(f, "let {} = {}", lhs.0, rhs),
+            Statement::Binding(lhs, rhs) => write!(f, "let {} = {}", lhs.name, rhs),
             Statement::Import(import) => write!(f, "{}", import),
             Statement::Expression(expr) => write!(f, "{}", expr),
         }

@@ -186,13 +186,13 @@ pub fn assign_to_expression(
 
             match base_value {
                 Value::Object(mut members) => {
-                    members.insert(index.0.clone(), value);
+                    members.insert(index.name.clone(), value);
                     assign_to_expression(&base, Value::Object(members), context)
                 }
                 base_value => Err(RuntimeError::NotAnObject {
                     object_expression: *base.clone(),
                     object_value: base_value.clone(),
-                    key: index.0.clone(),
+                    key: index.name.clone(),
                 }),
             }
         }
@@ -328,20 +328,20 @@ pub fn evaluate_expression_term(
 
             match object_value {
                 Value::Object(ref members) => {
-                    if let Some(value) = members.get(&index.0) {
+                    if let Some(value) = members.get(&index.name) {
                         Ok(value.clone())
                     } else {
                         Err(RuntimeError::ObjectKeyNotFound {
                             object_expression: *base.clone(),
                             object_value: object_value.clone(),
-                            key: index.0.clone(),
+                            key: index.name.clone(),
                         })
                     }
                 }
                 object_value => Err(RuntimeError::NotAnObject {
                     object_expression: *base.clone(),
                     object_value: object_value.clone(),
-                    key: index.0.clone(),
+                    key: index.name.clone(),
                 }),
             }
         }
@@ -506,9 +506,12 @@ mod tests {
         let expression = parse_expression("x + 1".to_string()).expect("parse error");
 
         let mut context = EvaluationContext::default();
-        context
-            .scope
-            .insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
+        context.scope.insert_binding(
+            &Identifier {
+                name: "x".to_string(),
+            },
+            Value::Number(55.into()),
+        );
 
         let result = evaluate_expression(&expression, &mut context);
         assert_eq!(result, Ok(Value::Number(56.into())));
@@ -519,12 +522,18 @@ mod tests {
         let expression = parse_expression("x + y".to_string()).expect("parse error");
 
         let mut context = EvaluationContext::default();
-        context
-            .scope
-            .insert_binding(&Identifier("x".to_string()), Value::Number(55.into()));
-        context
-            .scope
-            .insert_binding(&Identifier("y".to_string()), Value::Number(42.into()));
+        context.scope.insert_binding(
+            &Identifier {
+                name: "x".to_string(),
+            },
+            Value::Number(55.into()),
+        );
+        context.scope.insert_binding(
+            &Identifier {
+                name: "y".to_string(),
+            },
+            Value::Number(42.into()),
+        );
 
         let result = evaluate_expression(&expression, &mut context);
         assert_eq!(result, Ok(Value::Number(97.into())));

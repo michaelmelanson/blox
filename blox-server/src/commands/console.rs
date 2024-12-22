@@ -17,11 +17,15 @@ pub async fn console_command(directory: &str) -> Result<(), anyhow::Error> {
     let context = create_context(assets);
 
     context.scope.insert_binding(
-        &Identifier("print".to_string()),
+        &Identifier {
+            name: "print".to_string(),
+        },
         Value::Intrinsic(Intrinsic::new(
             "print",
             Arc::new(|arguments: HashMap<Identifier, Value>| {
-                if let Some(message) = arguments.get(&Identifier("message".to_string())) {
+                if let Some(message) = arguments.get(&Identifier {
+                    name: "message".to_string(),
+                }) {
                     info!(message = message.to_string());
                 }
 

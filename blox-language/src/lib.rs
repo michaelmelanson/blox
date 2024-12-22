@@ -34,7 +34,9 @@ mod tests {
         let actual = parse(&"let test = 55".to_string()).expect("parse error");
         assert_eq!(
             ast::Block(vec![ast::Statement::Binding(
-                ast::Identifier("test".to_string()),
+                ast::Identifier {
+                    name: "test".to_string()
+                },
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Number(
                     55.into()
                 )))
@@ -48,7 +50,9 @@ mod tests {
         let actual = parse(&"let test = 55 + 42".to_string()).expect("parse error");
         assert_eq!(
             ast::Block(vec![ast::Statement::Binding(
-                ast::Identifier("test".to_string()),
+                ast::Identifier {
+                    name: "test".to_string()
+                },
                 ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
                         ast::Literal::Number(55.into())
@@ -68,7 +72,9 @@ mod tests {
         let actual = parse(&"let test = (1 * 2) + 3".to_string()).expect("parse error");
         assert_eq!(
             ast::Block(vec![ast::Statement::Binding(
-                ast::Identifier("test".to_string()),
+                ast::Identifier {
+                    name: "test".to_string()
+                },
                 ast::Expression::BinaryExpression(
                     Box::new(ast::Expression::BinaryExpression(
                         Box::new(ast::Expression::Term(ast::ExpressionTerm::Literal(
@@ -94,7 +100,9 @@ mod tests {
         let actual = parse(&"let test = :symbol".to_string()).expect("parse error");
         assert_eq!(
             ast::Block(vec![ast::Statement::Binding(
-                ast::Identifier("test".to_string()),
+                ast::Identifier {
+                    name: "test".to_string()
+                },
                 ast::Expression::Term(ast::ExpressionTerm::Literal(ast::Literal::Symbol(
                     "symbol".to_string()
                 )))
