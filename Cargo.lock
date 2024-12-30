@@ -2342,7 +2342,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-blox"
 version = "0.1.0"
-source = "git+https://github.com/michaelmelanson/tree-sitter-blox#c04d3806a8fdf6e2a66f98ac589a2d1f644d1e05"
+source = "git+https://github.com/michaelmelanson/tree-sitter-blox#64d84ae10276e92b94c1bf6fb8a90d86272da185"
 dependencies = [
  "cc",
  "tree-sitter-language",
